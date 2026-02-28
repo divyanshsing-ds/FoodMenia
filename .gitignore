@@ -1,0 +1,19 @@
+# Dependencies
+node_modules
+Frontend/node_modules
+Backend/node_modules
+
+# Secrets
+.env
+Frontend/.env
+Backend/.env
+
+# Build outputs
+Frontend/dist
+Backend/dist
+
+# IDE/Logs
+.vscode
+.idea
+*.log
+.DS_Store
