@@ -1,4 +1,25 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap");
+
+:root {
+    --brand: #ff512f;
+    --brand-pink: #dd2476;
+    --brand-amber: #f09819;
+    --glow-primary: rgba(255, 81, 47, 0.22);
+    --glow-pink: rgba(221, 36, 118, 0.18);
+    --glass: rgba(255, 255, 255, 0.04);
+    --glass-hover: rgba(255, 255, 255, 0.07);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-hover: rgba(255, 81, 47, 0.32);
+    --text-1: #ffffff;
+    --text-2: rgba(255, 255, 255, 0.65);
+    --text-3: rgba(255, 255, 255, 0.35);
+    --radius-card: 22px;
+    --radius-btn: 14px;
+    --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.35);
+    --shadow-glow: 0 0 40px rgba(255, 81, 47, 0.12);
+    --transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 
 /* ===== RESET ===== */
 *,
@@ -10,8 +31,8 @@
 }
 
 body {
-    font-family: "Inter", sans-serif;
-    background: #0a0a0f;
+    font-family: "Outfit", "Inter", sans-serif;
+    background: #07070f;
     color: #e0e0e0;
     min-height: 100vh;
 }
@@ -20,14 +41,14 @@ body {
 .dashboard-container {
     display: flex;
     min-height: 100vh;
-    background: linear-gradient(145deg, #0a0a14 0%, #111128 50%, #0d1f3c 100%);
+    background: linear-gradient(145deg, #08080f 0%, #0e0e25 50%, #0a1830 100%);
 }
 
 .sidebar {
     width: 240px;
     min-width: 240px;
-    background: rgba(255, 255, 255, 0.03);
-    border-right: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.025);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
     display: flex;
     flex-direction: column;
     padding: 24px 0 24px;
@@ -35,7 +56,8 @@ body {
     top: 0;
     height: 100vh;
     overflow-y: auto;
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
 }
 
 .sidebar-brand {
@@ -77,42 +99,46 @@ body {
     color: rgba(255, 255, 255, 0.9);
 }
 
+
 /* ===== SIDEBAR NAV ITEMS ===== */
 .sidebar-nav {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: 12px 12px;
+    padding: 12px;
     flex: 1;
 }
 
 .nav-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 11px 16px;
+    gap: 12px;
+    padding: 12px 16px;
     border: none;
-    border-radius: 12px;
+    border-radius: 14px;
     background: transparent;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--text-3);
     font-family: inherit;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.25s ease;
+    transition: var(--transition);
     text-align: left;
     width: 100%;
+    letter-spacing: 0.2px;
 }
 
 .nav-item:hover {
     background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--text-2);
+    transform: translateX(3px);
 }
 
 .nav-item.active {
-    background: linear-gradient(135deg, rgba(255, 81, 47, 0.18), rgba(221, 36, 118, 0.18));
-    color: #fff;
-    box-shadow: inset 0 0 0 1px rgba(255, 81, 47, 0.25);
+    background: linear-gradient(135deg, rgba(255, 81, 47, 0.18), rgba(221, 36, 118, 0.14));
+    color: var(--text-1);
+    box-shadow: inset 0 0 0 1px rgba(255, 81, 47, 0.25), var(--shadow-glow);
+    border-left: 2px solid var(--brand);
 }
 
 /* ===== LOGOUT BUTTON ===== */
@@ -147,7 +173,7 @@ body {
 /* ===== DASHBOARD LAYOUT ===== */
 .dashboard-layout {
     min-height: 100vh;
-    background: linear-gradient(145deg, #0a0a14 0%, #111128 50%, #0d1f3c 100%);
+    background: linear-gradient(145deg, #08080f 0%, #0e0e25 50%, #0a1830 100%);
 }
 
 /* ===== TOP NAVBAR ===== */
@@ -156,12 +182,14 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 16px 40px;
-    background: rgba(255, 255, 255, 0.03);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    backdrop-filter: blur(20px);
+    background: rgba(8, 8, 20, 0.75);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
     position: sticky;
     top: 0;
     z-index: 100;
+    box-shadow: 0 1px 0 rgba(255, 81, 47, 0.06);
 }
 
 .dash-brand {
@@ -520,21 +548,39 @@ body {
 /* ===== SHARED MENU/FOOD CARDS ===== */
 .menu-card,
 .food-card {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
     overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: var(--transition);
     animation: fadeUp 0.5s ease;
     display: flex;
     flex-direction: column;
+    position: relative;
+}
+
+.menu-card::before,
+.food-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-card);
+    background: linear-gradient(135deg, rgba(255, 81, 47, 0.04) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
 }
 
 .menu-card:hover,
 .food-card:hover {
-    transform: translateY(-5px);
-    border-color: rgba(255, 81, 47, 0.3);
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+    transform: translateY(-6px);
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-card), var(--shadow-glow);
+}
+
+.menu-card:hover::before,
+.food-card:hover::before {
+    opacity: 1;
 }
 
 .menu-card-image,
@@ -658,16 +704,36 @@ body {
 }
 
 .order-card {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--border);
+    border-radius: 20px;
     padding: 24px;
-    transition: all 0.3s ease;
+    transition: var(--transition);
     animation: fadeUp 0.4s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.order-card::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: linear-gradient(to bottom, var(--brand), var(--brand-pink));
+    border-radius: 3px 0 0 3px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 .order-card:hover {
-    border-color: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: var(--shadow-card);
+}
+
+.order-card:hover::after {
+    opacity: 1;
 }
 
 .order-header {
@@ -1309,27 +1375,50 @@ body {
     position: fixed;
     top: 24px;
     right: 24px;
-    padding: 14px 24px;
-    border-radius: 14px;
+    padding: 14px 22px;
+    border-radius: 16px;
     font-size: 14px;
     font-weight: 600;
     z-index: 300;
-    animation: slideInRight 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-    max-width: 360px;
+    animation: slideInToast 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    max-width: 380px;
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    border: 1px solid;
+}
+
+@keyframes slideInToast {
+    from {
+        transform: translateX(120%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
 }
 
 .dash-toast.success {
-    background: rgba(34, 197, 94, 0.15);
-    border: 1px solid rgba(34, 197, 94, 0.3);
+    background: rgba(20, 60, 30, 0.85);
+    border-color: rgba(34, 197, 94, 0.35);
     color: #86efac;
-    backdrop-filter: blur(20px);
 }
 
 .dash-toast.error {
-    background: rgba(239, 68, 68, 0.15);
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    background: rgba(60, 15, 15, 0.85);
+    border-color: rgba(239, 68, 68, 0.35);
     color: #fca5a5;
-    backdrop-filter: blur(20px);
+}
+
+.dash-toast.info {
+    background: rgba(15, 30, 60, 0.85);
+    border-color: rgba(99, 179, 237, 0.35);
+    color: #93c5fd;
 }
 
 /* ===== LOADING ===== */
@@ -1359,12 +1448,24 @@ body {
 @keyframes fadeUp {
     from {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(22px);
     }
 
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+@keyframes glow {
+
+    0%,
+    100% {
+        opacity: 0.5;
+    }
+
+    50% {
+        opacity: 1;
     }
 }
 
@@ -1472,29 +1573,35 @@ body {
 
 .restaurants-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 22px;
     margin: 24px 0;
 }
 
 .restaurant-banner-card {
     position: relative;
-    border-radius: 16px;
+    border-radius: 20px;
     overflow: hidden;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
     cursor: pointer;
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    transition: var(--transition);
+    border: 1px solid var(--border);
 }
 
 .restaurant-banner-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    transform: translateY(-6px);
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-card), var(--shadow-glow);
 }
 
 .restaurant-banner-img {
     width: 100%;
-    height: 180px;
+    height: 190px;
     object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.restaurant-banner-card:hover .restaurant-banner-img {
+    transform: scale(1.06);
 }
 
 .restaurant-banner-overlay {
@@ -1502,20 +1609,22 @@ body {
     bottom: 0;
     left: 0;
     right: 0;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent 60%);
-    padding: 20px 16px 16px;
+    background: linear-gradient(to top, rgba(5, 5, 20, 0.9) 0%, rgba(5, 5, 20, 0.3) 60%, transparent 100%);
+    padding: 24px 18px 18px;
     color: white;
 }
 
 .restaurant-banner-name {
-    margin: 0 0 6px;
-    font-size: 1.35rem;
-    font-weight: 600;
+    margin: 0 0 4px;
+    font-size: 1.25rem;
+    font-weight: 800;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 .restaurant-banner-info {
-    font-size: 0.9rem;
-    opacity: 0.9;
+    font-size: 0.85rem;
+    opacity: 0.75;
+    font-weight: 500;
 }
 
 .btn-back {
