@@ -1,8 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const MenuItem = require("../models/MenuItem");
-const { authMiddleware } = require("../middleware/auth");
+const { authMiddleware, roleMiddleware } = require("../middleware/auth");
 const upload = require("../middleware/upload");
+const fs = require("fs");
+const path = require("path");
 
 
 // =====================================================
@@ -22,12 +24,8 @@ router.get("/", async (req, res) => {
 
 
 // GET operator menu
-router.get("/my", authMiddleware, async (req, res) => {
+router.get("/my", authMiddleware, roleMiddleware("operator"), async (req, res) => {
   try {
-    if (req.user.role !== "operator") {
-      return res.status(403).json({ success: false, message: "Unauthorized" });
-    }
-
     const items = await MenuItem.find({ operatorId: req.user.id })
       .sort({ createdAt: -1 });
 
@@ -41,16 +39,12 @@ router.get("/my", authMiddleware, async (req, res) => {
 router.post("/", (req, res, next) => {
   console.log("📨 Incoming POST /api/menu request");
   next();
-}, authMiddleware, (req, res, next) => {
+}, authMiddleware, roleMiddleware("operator"), (req, res, next) => {
   console.log("🔑 Auth passed for /api/menu");
   next();
 }, upload.single("image"), async (req, res) => {
   console.log("📁 File upload passed, creating MenuItem");
   try {
-    if (req.user.role !== "operator") {
-      return res.status(403).json({ success: false, message: "Unauthorized" });
-    }
-
     const { name, description, price, category } = req.body;
 
     const newItem = await MenuItem.create({
@@ -70,7 +64,7 @@ router.post("/", (req, res, next) => {
 });
 
 // UPDATE menu item
-router.put("/:id", authMiddleware, upload.single("image"), async (req, res) => {
+router.put("/:id", authMiddleware, roleMiddleware("operator"), upload.single("image"), async (req, res) => {
   const { id } = req.params;
   console.log(`\n🔄 [UPDATE REQUEST] Item ID: ${id}`);
   console.log(`👤 Operator: ${req.user.email} (${req.user.id})`);
@@ -101,9 +95,12 @@ router.put("/:id", authMiddleware, upload.single("image"), async (req, res) => {
 
     // Apply image update if a new file was uploaded
     if (req.file) {
-      const oldPath = item.image;
+      if (item.image) {
+        const oldPath = path.join(__dirname, "..", item.image);
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
       item.image = `/uploads/${req.file.filename}`;
-      console.log(`✅ Image Successfully Replaced: [${oldPath}] -> [${item.image}]`);
+      console.log(`✅ Image Successfully Replaced: -> [${item.image}]`);
     }
 
     await item.save();
@@ -121,7 +118,7 @@ router.put("/:id", authMiddleware, upload.single("image"), async (req, res) => {
 });
 
 // DELETE item
-router.delete("/:id", authMiddleware, async (req, res) => {
+router.delete("/:id", authMiddleware, roleMiddleware("operator"), async (req, res) => {
   try {
     const item = await MenuItem.findById(req.params.id);
 
@@ -131,6 +128,11 @@ router.delete("/:id", authMiddleware, async (req, res) => {
 
     if (item.operatorId.toString() !== req.user.id) {
       return res.status(403).json({ success: false });
+    }
+
+    if (item.image) {
+      const imagePath = path.join(__dirname, "..", item.image);
+      if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
     }
 
     await item.deleteOne();

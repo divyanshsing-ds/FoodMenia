@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/creator.css";
+import CONFIG from "../utils/config";
 import { generateReelDescription } from "../utils/gemini";
-
-const API_BASE = "http://localhost:9090/api";
 
 export default function CreatorDashboard() {
     const navigate = useNavigate();
@@ -42,7 +41,6 @@ export default function CreatorDashboard() {
     }, []);
 
     useEffect(() => {
-        if (!token || user.role !== "creator") { navigate("/"); return; }
         setCreatorBio(user.creatorBio || "");
         fetchMyReels();
         fetchRestaurants();
@@ -63,7 +61,7 @@ export default function CreatorDashboard() {
     const fetchMyReels = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/video/my`, { headers: { Authorization: `Bearer ${token}` } });
+            const res = await fetch(`${CONFIG.API_BASE}/video/my`, { headers: { Authorization: `Bearer ${token}` } });
             const data = await res.json();
             if (data.success) setReels(data.data);
         } catch { console.error("Failed to fetch reels"); }
@@ -72,7 +70,7 @@ export default function CreatorDashboard() {
 
     const fetchRestaurants = async () => {
         try {
-            const res = await fetch(`${API_BASE}/auth/operators`);
+            const res = await fetch(`${CONFIG.API_BASE}/auth/operators`);
             const data = await res.json();
             if (data.success) setRestaurants(data.data);
         } catch { console.error("Failed to fetch restaurants"); }
@@ -122,7 +120,7 @@ export default function CreatorDashboard() {
             fd.append("description", formData.description);
             fd.append("restaurantId", formData.restaurantId);
             fd.append("video", videoFile);
-            const res = await fetch(`${API_BASE}/video/upload`, {
+            const res = await fetch(`${CONFIG.API_BASE}/video/upload`, {
                 method: "POST",
                 headers: { Authorization: `Bearer ${token}` },
                 body: fd,
@@ -141,7 +139,7 @@ export default function CreatorDashboard() {
     const handleDelete = async (id) => {
         if (!window.confirm("Delete this reel?")) return;
         try {
-            const res = await fetch(`${API_BASE}/video/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+            const res = await fetch(`${CONFIG.API_BASE}/video/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
             const data = await res.json();
             if (data.success) setReels(reels.filter(r => r._id !== id));
         } catch { alert("Delete failed"); }
@@ -151,7 +149,7 @@ export default function CreatorDashboard() {
         if (!editReel.title.trim()) return alert("Title is required");
         setEditSaving(true);
         try {
-            const res = await fetch(`${API_BASE}/video/${editReel._id}`, {
+            const res = await fetch(`${CONFIG.API_BASE}/video/${editReel._id}`, {
                 method: "PATCH",
                 headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
                 body: JSON.stringify({ title: editReel.title, description: editReel.description }),
@@ -168,7 +166,7 @@ export default function CreatorDashboard() {
     const handleUpdateBio = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/auth/profile`, {
+            const res = await fetch(`${CONFIG.API_BASE}/auth/profile`, {
                 method: "PATCH",
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -194,7 +192,7 @@ export default function CreatorDashboard() {
 
     const handleLikeComment = async (reelId, commentId) => {
         try {
-            const res = await fetch(`${API_BASE}/video/${reelId}/comment/${commentId}/like`, {
+            const res = await fetch(`${CONFIG.API_BASE}/video/${reelId}/comment/${commentId}/like`, {
                 method: "POST",
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -223,7 +221,7 @@ export default function CreatorDashboard() {
     const handleReplyComment = async () => {
         if (!newReply.trim()) return;
         try {
-            const res = await fetch(`${API_BASE}/video/${replyTo.reelId}/comment/${replyTo.commentId}/reply`, {
+            const res = await fetch(`${CONFIG.API_BASE}/video/${replyTo.reelId}/comment/${replyTo.commentId}/reply`, {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -253,7 +251,7 @@ export default function CreatorDashboard() {
     const handleDeleteComment = async (reelId, commentId) => {
         if (!window.confirm("Delete this comment?")) return;
         try {
-            const res = await fetch(`${API_BASE}/video/${reelId}/comment/${commentId}`, {
+            const res = await fetch(`${CONFIG.API_BASE}/video/${reelId}/comment/${commentId}`, {
                 method: "DELETE",
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -268,7 +266,7 @@ export default function CreatorDashboard() {
         } catch { alert("Delete failed"); }
     };
 
-    const videoUrl = (url) => url.startsWith("http") ? url : `http://localhost:9090${url}`;
+    const videoUrl = (url) => url.startsWith("http") ? url : `${CONFIG.UPLOADS_BASE}${url}`;
 
     // ── Analytics totals ──
     const totalLikes = reels.reduce((s, r) => s + (r.likedBy?.length || 0), 0);

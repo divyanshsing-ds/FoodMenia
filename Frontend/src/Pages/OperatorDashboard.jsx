@@ -4,7 +4,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import "../styles/dashboard.css";
 
-const API_BASE = "http://localhost:9090/api";
+import CONFIG from "../utils/config";
 
 export default function OperatorDashboard() {
     const navigate = useNavigate();
@@ -45,7 +45,7 @@ export default function OperatorDashboard() {
     // Fetch menu items
     const fetchMenu = useCallback(async () => {
         try {
-            const res = await fetch(`${API_BASE}/menu/my?t=${Date.now()}`, { headers: authHeaders() });
+            const res = await fetch(`${CONFIG.API_BASE}/menu/my?t=${Date.now()}`, { headers: authHeaders() });
             const data = await res.json();
             if (data.success) setMenuItems(data.data);
         } catch {
@@ -56,7 +56,7 @@ export default function OperatorDashboard() {
     // Fetch orders
     const fetchOrders = useCallback(async (isSilent = false) => {
         try {
-            const res = await fetch(`${API_BASE}/orders/operator`, { headers: authHeaders() });
+            const res = await fetch(`${CONFIG.API_BASE}/orders/operator`, { headers: authHeaders() });
             const data = await res.json();
             if (data.success) {
                 // Check for new orders
@@ -95,7 +95,7 @@ export default function OperatorDashboard() {
             fd.append("description", formData.description);
             fd.append("price", formData.price);
             fd.append("category", formData.category);
-            const url = editingItem ? `${API_BASE}/menu/${editingItem._id}` : `${API_BASE}/menu`;
+            const url = editingItem ? `${CONFIG.API_BASE}/menu/${editingItem._id}` : `${CONFIG.API_BASE}/menu`;
 
             if (imageFile) {
                 console.log("📎 Appending new image file:", imageFile.name);
@@ -136,7 +136,7 @@ export default function OperatorDashboard() {
             price: item.price,
             category: item.category || "General"
         });
-        setImagePreview(item.image ? `http://localhost:9090${item.image}` : null);
+        setImagePreview(item.image ? `${CONFIG.UPLOADS_BASE}${item.image}` : null);
         setShowAddForm(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -157,7 +157,7 @@ export default function OperatorDashboard() {
     // Delete menu item
     const handleDeleteItem = async (id) => {
         try {
-            const res = await fetch(`${API_BASE}/menu/${id}`, {
+            const res = await fetch(`${CONFIG.API_BASE}/menu/${id}`, {
                 method: "DELETE",
                 headers: authHeaders(),
             });
@@ -176,7 +176,7 @@ export default function OperatorDashboard() {
     // Update order status
     const handleUpdateStatus = async (orderId, status, rejectionReason = "") => {
         try {
-            const res = await fetch(`${API_BASE}/orders/${orderId}/status`, {
+            const res = await fetch(`${CONFIG.API_BASE}/orders/${orderId}/status`, {
                 method: "PUT",
                 headers: { ...authHeaders(), "Content-Type": "application/json" },
                 body: JSON.stringify({ status, rejectionReason }),
@@ -194,7 +194,7 @@ export default function OperatorDashboard() {
     // Rating Interactions
     const handleLikeRating = async (itemId, ratingId) => {
         try {
-            const res = await fetch(`${API_BASE}/menu/${itemId}/rate/${ratingId}/like`, {
+            const res = await fetch(`${CONFIG.API_BASE}/menu/${itemId}/rate/${ratingId}/like`, {
                 method: "POST",
                 headers: authHeaders(),
             });
@@ -211,7 +211,7 @@ export default function OperatorDashboard() {
     const handleReplyRating = async (itemId, ratingId, text) => {
         if (!text.trim()) return;
         try {
-            const res = await fetch(`${API_BASE}/menu/${itemId}/rate/${ratingId}/reply`, {
+            const res = await fetch(`${CONFIG.API_BASE}/menu/${itemId}/rate/${ratingId}/reply`, {
                 method: "POST",
                 headers: { ...authHeaders(), "Content-Type": "application/json" },
                 body: JSON.stringify({ text }),
@@ -579,7 +579,7 @@ export default function OperatorDashboard() {
                                     <div className="menu-card" key={item._id}>
                                         {item.image ? (
                                             <img
-                                                src={`http://localhost:9090${item.image}`}
+                                                src={`${CONFIG.UPLOADS_BASE}${item.image}`}
                                                 alt={item.name}
                                                 className="menu-card-image"
                                             />
@@ -655,7 +655,7 @@ export default function OperatorDashboard() {
                                                         <div className="order-item-left">
                                                             {item.image && (
                                                                 <img
-                                                                    src={`http://localhost:9090${item.image}`}
+                                                                    src={`${CONFIG.UPLOADS_BASE}${item.image}`}
                                                                     alt={item.name}
                                                                     className="order-item-img"
                                                                 />

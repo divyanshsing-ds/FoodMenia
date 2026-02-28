@@ -1,8 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const Video = require("../models/Video");
-const { authMiddleware } = require("../middleware/auth");
+const { authMiddleware, roleMiddleware } = require("../middleware/auth");
 const upload = require("../middleware/upload");
+const fs = require("fs");
+const path = require("path");
 
 // =====================================================
 //  FETCH ALL VIDEOS (Feed)
@@ -25,12 +27,8 @@ router.get("/feed", async (req, res) => {
 //  FETCH CREATOR VIDEOS (My Videos)
 //  /api/video/my
 // =====================================================
-router.get("/my", authMiddleware, async (req, res) => {
+router.get("/my", authMiddleware, roleMiddleware("creator"), async (req, res) => {
     try {
-        if (req.user.role !== "creator") {
-            return res.status(403).json({ success: false, message: "Only creators can view their reels" });
-        }
-
         const videos = await Video.find({ creatorId: req.user.id })
             .populate("restaurantId", "restaurantName")
             .sort({ createdAt: -1 });
@@ -45,12 +43,8 @@ router.get("/my", authMiddleware, async (req, res) => {
 //  UPLOAD VIDEO
 //  /api/video/upload
 // =====================================================
-router.post("/upload", authMiddleware, upload.single("video"), async (req, res) => {
+router.post("/upload", authMiddleware, roleMiddleware("creator"), upload.single("video"), async (req, res) => {
     try {
-        if (req.user.role !== "creator") {
-            return res.status(403).json({ success: false, message: "Only creators can upload reels" });
-        }
-
         if (!req.file) {
             return res.status(400).json({ success: false, message: "No video file provided" });
         }
@@ -78,7 +72,7 @@ router.post("/upload", authMiddleware, upload.single("video"), async (req, res) 
 });
 
 // UPDATE VIDEO (title / description)
-router.patch("/:id", authMiddleware, async (req, res) => {
+router.patch("/:id", authMiddleware, roleMiddleware("creator"), async (req, res) => {
     try {
         const video = await Video.findById(req.params.id);
         if (!video) return res.status(404).json({ success: false, message: "Video not found" });
@@ -99,13 +93,19 @@ router.patch("/:id", authMiddleware, async (req, res) => {
 });
 
 // DELETE VIDEO
-router.delete("/:id", authMiddleware, async (req, res) => {
+router.delete("/:id", authMiddleware, roleMiddleware("creator"), async (req, res) => {
     try {
         const video = await Video.findById(req.params.id);
         if (!video) return res.status(404).json({ success: false, message: "Video not found" });
 
         if (video.creatorId.toString() !== req.user.id) {
             return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
+
+        // Delete files from server
+        if (video.videoUrl) {
+            const videoPath = path.join(__dirname, "..", video.videoUrl);
+            if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
         }
 
         await Video.findByIdAndDelete(req.params.id);

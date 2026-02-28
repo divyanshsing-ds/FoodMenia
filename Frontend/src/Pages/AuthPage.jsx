@@ -8,7 +8,9 @@ const ROLES = [
   { key: "operator", label: "Operator", icon: "🏪" },
 ];
 
-const API_BASE = "http://localhost:9090/api/auth";
+import CONFIG from "../utils/config";
+
+const API_AUTH = `${CONFIG.API_BASE}/auth`;
 
 export default function AuthPage() {
   const navigate = useNavigate();
@@ -35,7 +37,7 @@ export default function AuthPage() {
         ? { ...formData, role }
         : { email: formData.email, password: formData.password };
 
-      const res = await fetch(`${API_BASE}${endpoint}`, {
+      const res = await fetch(`${API_AUTH}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/dashboard.css";
+import CONFIG from "../utils/config";
 import { getNutritionInfo } from "../utils/gemini";
-
-const API_BASE = "http://localhost:9090/api";
 
 const TRACKING_STEPS = [
     { key: "pending", label: "Placed", icon: "📝" },
@@ -59,7 +58,7 @@ export default function UserDashboard() {
 
     const fetchReels = useCallback(async () => {
         try {
-            const res = await fetch(`${API_BASE}/video/feed`);
+            const res = await fetch(`${CONFIG.API_BASE}/video/feed`);
             const data = await res.json();
             if (data.success) {
                 setReels(data.data);
@@ -94,7 +93,7 @@ export default function UserDashboard() {
 
     const handleLike = async (reelId) => {
         try {
-            const res = await fetch(`${API_BASE}/video/${reelId}/like`, {
+            const res = await fetch(`${CONFIG.API_BASE}/video/${reelId}/like`, {
                 method: "POST",
                 headers: authHeaders()
             });
@@ -118,8 +117,8 @@ export default function UserDashboard() {
 
         try {
             const url = replyTo
-                ? `${API_BASE}/video/${showComments.reelId}/comment/${replyTo.commentId}/reply`
-                : `${API_BASE}/video/${showComments.reelId}/comment`;
+                ? `${CONFIG.API_BASE}/video/${showComments.reelId}/comment/${replyTo.commentId}/reply`
+                : `${CONFIG.API_BASE}/video/${showComments.reelId}/comment`;
 
             const res = await fetch(url, {
                 method: "POST",
@@ -152,7 +151,7 @@ export default function UserDashboard() {
 
     const handleLikeComment = async (commentId) => {
         try {
-            const res = await fetch(`${API_BASE}/video/${showComments.reelId}/comment/${commentId}/like`, {
+            const res = await fetch(`${CONFIG.API_BASE}/video/${showComments.reelId}/comment/${commentId}/like`, {
                 method: "POST",
                 headers: authHeaders()
             });
@@ -180,7 +179,7 @@ export default function UserDashboard() {
     const handleDeleteComment = async (commentId) => {
         if (!window.confirm("Delete this comment?")) return;
         try {
-            const res = await fetch(`${API_BASE}/video/${showComments.reelId}/comment/${commentId}`, {
+            const res = await fetch(`${CONFIG.API_BASE}/video/${showComments.reelId}/comment/${commentId}`, {
                 method: "DELETE",
                 headers: authHeaders()
             });
@@ -204,7 +203,7 @@ export default function UserDashboard() {
         if (viewedReels.current.has(reelId)) return; // already counted this session
         viewedReels.current.add(reelId);
         try {
-            const res = await fetch(`${API_BASE}/video/${reelId}/view`, {
+            const res = await fetch(`${CONFIG.API_BASE}/video/${reelId}/view`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" }
             });
@@ -219,7 +218,7 @@ export default function UserDashboard() {
 
     const fetchMenu = useCallback(async () => {
         try {
-            const res = await fetch(`${API_BASE}/menu`);
+            const res = await fetch(`${CONFIG.API_BASE}/menu`);
             const data = await res.json();
             if (data.success) setMenuItems(data.data);
         } catch {
@@ -229,7 +228,7 @@ export default function UserDashboard() {
 
     const fetchOrders = useCallback(async (isSilent = false) => {
         try {
-            const res = await fetch(`${API_BASE}/orders/my`, { headers: authHeaders() });
+            const res = await fetch(`${CONFIG.API_BASE}/orders/my`, { headers: authHeaders() });
             const data = await res.json();
             if (data.success) {
                 // Detect status changes for notifications
@@ -255,16 +254,12 @@ export default function UserDashboard() {
     }, [authHeaders]);
 
     useEffect(() => {
-        if (!token || user.role !== "user") {
-            navigate("/");
-            return;
-        }
         fetchMenu();
         fetchReels();
         fetchOrders();
         const interval = setInterval(() => fetchOrders(true), 15000);
         return () => clearInterval(interval);
-    }, [token, user.role, navigate, fetchMenu, fetchReels, fetchOrders]);
+    }, [fetchMenu, fetchReels, fetchOrders]);
 
     // Group menu items by restaurant
     const groupedMenu = menuItems.reduce((acc, item) => {
@@ -310,7 +305,7 @@ export default function UserDashboard() {
     const getRestaurantImage = (group) => {
         const first = group.items.find((i) => i.image);
         return first
-            ? `http://localhost:9090${first.image}`
+            ? `${CONFIG.UPLOADS_BASE}${first.image}`
             : `https://via.placeholder.com/400x180?text=${encodeURIComponent(group.restaurantName)}`;
     };
 
@@ -370,7 +365,7 @@ export default function UserDashboard() {
             }, {});
 
             for (const group of Object.values(grouped)) {
-                const res = await fetch(`${API_BASE}/orders`, {
+                const res = await fetch(`${CONFIG.API_BASE}/orders`, {
                     method: "POST",
                     headers: authHeaders(),
                     body: JSON.stringify({
@@ -403,7 +398,7 @@ export default function UserDashboard() {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/menu/${ratingModal.item.menuItemId}/rate`, {
+            const res = await fetch(`${CONFIG.API_BASE}/menu/${ratingModal.item.menuItemId}/rate`, {
                 method: "POST",
                 headers: authHeaders(),
                 body: JSON.stringify({ rating: userRating, comment: userComment }),
@@ -427,7 +422,7 @@ export default function UserDashboard() {
 
     const handleLikeRating = async (itemId, ratingId) => {
         try {
-            const res = await fetch(`${API_BASE}/menu/${itemId}/rate/${ratingId}/like`, {
+            const res = await fetch(`${CONFIG.API_BASE}/menu/${itemId}/rate/${ratingId}/like`, {
                 method: "POST",
                 headers: authHeaders(),
             });
@@ -470,7 +465,7 @@ export default function UserDashboard() {
         if (!cancellationModal.reason.trim()) return showToast("error", "Please provide a reason");
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/orders/${cancellationModal.orderId}/cancel`, {
+            const res = await fetch(`${CONFIG.API_BASE}/orders/${cancellationModal.orderId}/cancel`, {
                 method: "PATCH",
                 headers: authHeaders(),
                 body: JSON.stringify({ reason: cancellationModal.reason }),
@@ -635,7 +630,7 @@ export default function UserDashboard() {
                                             <div className="food-card" key={item._id}>
                                                 {item.image ? (
                                                     <img
-                                                        src={`http://localhost:9090${item.image}`}
+                                                        src={`${CONFIG.UPLOADS_BASE}${item.image}`}
                                                         alt={item.name}
                                                         className="food-card-image"
                                                     />
@@ -688,7 +683,7 @@ export default function UserDashboard() {
                                     <div className="reel-card" key={`${reel._id}-${idx}`}>
                                         <video
                                             key={reel._id}
-                                            src={reel.videoUrl.startsWith("http") ? reel.videoUrl : `http://localhost:9090${reel.videoUrl}`}
+                                            src={reel.videoUrl.startsWith("http") ? reel.videoUrl : `${CONFIG.UPLOADS_BASE}${reel.videoUrl}`}
                                             className="reel-video"
                                             autoPlay
                                             loop
@@ -860,7 +855,7 @@ export default function UserDashboard() {
                                                         <div className="order-item-left">
                                                             {item.image && (
                                                                 <img
-                                                                    src={`http://localhost:9090${item.image}`}
+                                                                    src={`${CONFIG.UPLOADS_BASE}${item.image}`}
                                                                     alt={item.name}
                                                                     className="order-item-img"
                                                                 />

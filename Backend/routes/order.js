@@ -2,19 +2,15 @@ const express = require("express");
 const router = express.Router();
 const Order = require("../models/Order");
 const MenuItem = require("../models/MenuItem");
-const { authMiddleware } = require("../middleware/auth");
+const { authMiddleware, roleMiddleware } = require("../middleware/auth");
 
 
 // =====================================================
 //  GET OPERATOR ORDERS
 //  /api/orders/operator
 // =====================================================
-router.get("/operator", authMiddleware, async (req, res) => {
+router.get("/operator", authMiddleware, roleMiddleware("operator"), async (req, res) => {
   try {
-    if (req.user.role !== "operator") {
-      return res.status(403).json({ success: false });
-    }
-
     const orders = await Order.find({ operatorId: req.user.id })
       .sort({ createdAt: -1 });
 
@@ -29,12 +25,8 @@ router.get("/operator", authMiddleware, async (req, res) => {
 //  GET USER ORDERS
 //  /api/orders/my
 // =====================================================
-router.get("/my", authMiddleware, async (req, res) => {
+router.get("/my", authMiddleware, roleMiddleware("user"), async (req, res) => {
   try {
-    if (req.user.role !== "user") {
-      return res.status(403).json({ success: false });
-    }
-
     const orders = await Order.find({ userId: req.user.id })
       .sort({ createdAt: -1 });
 
@@ -49,12 +41,8 @@ router.get("/my", authMiddleware, async (req, res) => {
 //  CREATE ORDER
 //  /api/orders
 // =====================================================
-router.post("/", authMiddleware, async (req, res) => {
+router.post("/", authMiddleware, roleMiddleware("user"), async (req, res) => {
   try {
-    if (req.user.role !== "user") {
-      return res.status(403).json({ success: false });
-    }
-
     const { operatorId, restaurantName, items } = req.body;
 
     if (!items || items.length === 0) {
@@ -105,7 +93,7 @@ router.post("/", authMiddleware, async (req, res) => {
 //  UPDATE ORDER STATUS
 //  /api/orders/:id/status
 // =====================================================
-router.put("/:id/status", authMiddleware, async (req, res) => {
+router.put("/:id/status", authMiddleware, roleMiddleware("operator"), async (req, res) => {
   try {
     const { status, rejectionReason } = req.body;
 
@@ -160,7 +148,7 @@ router.put("/:id/status", authMiddleware, async (req, res) => {
 //  CANCEL ORDER (User)
 //  /api/orders/:id/cancel
 // =====================================================
-router.patch("/:id/cancel", authMiddleware, async (req, res) => {
+router.patch("/:id/cancel", authMiddleware, roleMiddleware("user"), async (req, res) => {
   try {
     const { reason } = req.body;
     const order = await Order.findById(req.params.id);
