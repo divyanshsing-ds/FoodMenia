@@ -35,7 +35,7 @@ export default function AuthPage() {
       const endpoint = isSignup ? "/signup" : "/login";
       const body = isSignup
         ? { ...formData, role }
-        : { email: formData.email, password: formData.password };
+        : { email: formData.email, password: formData.password, role }; // role required for login too
 
       const res = await fetch(`${API_AUTH}${endpoint}`, {
         method: "POST",
@@ -46,9 +46,9 @@ export default function AuthPage() {
       const data = await res.json();
 
       if (data.success) {
-        // Store JWT token and user data
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.data));
+        // Store JWT token and user data under role-specific keys
+        localStorage.setItem(CONFIG.tokenKey(role), data.token);
+        localStorage.setItem(CONFIG.dataKey(role), JSON.stringify(data.data));
         setMessage({ type: "success", text: data.message });
         setFormData({});
         e.target.reset();
@@ -130,23 +130,21 @@ export default function AuthPage() {
             </div>
           )}
 
-          {/* ROLE SWITCH (Signup only) */}
-          {isSignup && (
-            <div className="role-switch">
-              {ROLES.map((r) => (
-                <button
-                  key={r.key}
-                  id={`role-${r.key}`}
-                  className={role === r.key ? "active" : ""}
-                  onClick={() => setRole(r.key)}
-                  title={`Sign up as ${r.label}`}
-                >
-                  <span className="role-icon">{r.icon}</span>
-                  <span className="role-label">{r.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
+          {/* ROLE SWITCH — shown on BOTH login and signup */}
+          <div className="role-switch">
+            {ROLES.map((r) => (
+              <button
+                key={r.key}
+                id={`role-${r.key}`}
+                className={role === r.key ? "active" : ""}
+                onClick={() => setRole(r.key)}
+                title={`${isSignup ? "Sign up" : "Login"} as ${r.label}`}
+              >
+                <span className="role-icon">{r.icon}</span>
+                <span className="role-label">{r.label}</span>
+              </button>
+            ))}
+          </div>
 
           {/* FORM */}
           <form onSubmit={handleSubmit} className="auth-form">

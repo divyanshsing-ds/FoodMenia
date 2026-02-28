@@ -17,11 +17,34 @@ const orderSchema = new mongoose.Schema(
             },
         ],
         totalAmount: { type: Number, required: true },
+
+        // ── Order flow ──────────────────────────────────────
         status: {
             type: String,
             default: "pending",
-            enum: ["pending", "confirmed", "preparing", "out_for_delivery", "delivered", "rejected", "cancelled", "cancel_requested"],
+            enum: [
+                "pending", "confirmed", "preparing",
+                "out_for_delivery", "delivered",
+                "rejected", "cancelled", "cancel_requested",
+            ],
         },
+
+        // ── Payment ──────────────────────────────────────────
+        paymentMethod: {
+            type: String,
+            enum: ["cod", "upi"],
+            required: true,
+        },
+        paymentStatus: {
+            type: String,
+            enum: ["pending", "paid", "refunded"],
+            default: "pending",
+        },
+
+        // ── Delivery OTP ─────────────────────────────────────
+        deliveryOTP: { type: String, default: null },
+
+        // ── Reasons ──────────────────────────────────────────
         rejectionReason: { type: String, default: "" },
         cancellationReason: { type: String, default: "" },
     },

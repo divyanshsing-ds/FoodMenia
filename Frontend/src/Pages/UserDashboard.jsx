@@ -38,10 +38,13 @@ export default function UserDashboard() {
     const [loadingCartNutrition, setLoadingCartNutrition] = useState(false);
     const [displayReels, setDisplayReels] = useState([]);
     const [reviewPanel, setReviewPanel] = useState({ show: false, item: null });
+    const [paymentMethod, setPaymentMethod] = useState("cod"); // "cod" | "upi"
+    const [upiModal, setUpiModal] = useState({ show: false, orderId: null, amount: 0 });
+    const [pendingCheckoutData, setPendingCheckoutData] = useState(null); // grouped cart data waiting for UPI
     const orderStatusRef = useRef({});
 
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const token = localStorage.getItem("token");
+    const user = JSON.parse(localStorage.getItem(CONFIG.dataKey("user")) || "{}");
+    const token = localStorage.getItem(CONFIG.tokenKey("user"));
 
     const showToast = (type, text) => {
         setToast({ type, text });
@@ -253,6 +256,27 @@ export default function UserDashboard() {
         }
     }, [authHeaders]);
 
+    // ─── Post-Checkout & Tab Effects ───
+
+    // 1. Scroll to top when tab changes
+    useEffect(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }, [activeTab]);
+
+    // 2. Refresh orders immediately when switching to the orders tab
+    useEffect(() => {
+        if (activeTab === "orders" && token) {
+            fetchOrders(true);
+        }
+    }, [activeTab, fetchOrders, token]);
+
+    // 3. Local role protection
+    useEffect(() => {
+        if (!token || user.role !== "user") {
+            navigate("/");
+        }
+    }, [token, user.role, navigate]);
+
     useEffect(() => {
         fetchMenu();
         fetchReels();
@@ -364,31 +388,79 @@ export default function UserDashboard() {
                 return acc;
             }, {});
 
-            for (const group of Object.values(grouped)) {
-                const res = await fetch(`${CONFIG.API_BASE}/orders`, {
-                    method: "POST",
-                    headers: authHeaders(),
-                    body: JSON.stringify({
-                        operatorId: group.operatorId,
-                        restaurantName: group.restaurantName,
-                        items: group.items,
-                    }),
-                });
-                const data = await res.json();
-                if (!data.success) {
-                    showToast("error", data.message || "Order failed");
-                    setLoading(false);
-                    return;
-                }
+            // --- UPI: show payment modal before creating orders ---
+            if (paymentMethod === "upi") {
+                setPendingCheckoutData(grouped);
+                setUpiModal({ show: true, orderId: null, amount: cartTotal });
+                setLoading(false);
+                return;
             }
 
-            showToast("success", "Order placed successfully! 🎉");
+            // --- COD: place orders directly ---
+            const orderIds = await placeOrders(grouped, "cod");
+            if (orderIds) {
+                showToast("success", "Order placed successfully! 🎉");
+                setCart([]);
+                setShowCart(false);
+                setActiveTab("orders");
+                fetchOrders();
+            }
+        } catch (err) {
+            showToast("error", "Failed to place order");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Shared order creation helper used by both COD and UPI flows
+    const placeOrders = async (grouped, method) => {
+        const placedOrderIds = [];
+        for (const group of Object.values(grouped)) {
+            const res = await fetch(`${CONFIG.API_BASE}/orders`, {
+                method: "POST",
+                headers: authHeaders(),
+                body: JSON.stringify({
+                    operatorId: group.operatorId,
+                    restaurantName: group.restaurantName,
+                    items: group.items,
+                    paymentMethod: method,
+                }),
+            });
+            const data = await res.json();
+            if (!data.success) {
+                showToast("error", data.message || "Order failed");
+                return null;
+            }
+            placedOrderIds.push(data.data._id);
+        }
+        return placedOrderIds;
+    };
+
+    // Called when user clicks "Confirm Payment" in the UPI modal
+    const handleUpiConfirm = async () => {
+        if (!pendingCheckoutData) return;
+        setLoading(true);
+        try {
+            const orderIds = await placeOrders(pendingCheckoutData, "upi");
+            if (!orderIds) { setLoading(false); return; }
+
+            // Mark each new order as paid via the /pay endpoint
+            for (const id of orderIds) {
+                await fetch(`${CONFIG.API_BASE}/orders/${id}/pay`, {
+                    method: "PUT",
+                    headers: authHeaders(),
+                });
+            }
+
+            showToast("success", "UPI Payment confirmed! Order placed 🎉");
             setCart([]);
             setShowCart(false);
+            setUpiModal({ show: false, orderId: null, amount: 0 });
+            setPendingCheckoutData(null);
             setActiveTab("orders");
             fetchOrders();
         } catch {
-            showToast("error", "Failed to place order");
+            showToast("error", "Payment failed. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -437,8 +509,8 @@ export default function UserDashboard() {
     };
 
     const handleLogout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        localStorage.removeItem(CONFIG.tokenKey("user"));
+        localStorage.removeItem(CONFIG.dataKey("user"));
         navigate("/");
     };
 
@@ -874,6 +946,12 @@ export default function UserDashboard() {
                                                 <div className="order-total">
                                                     <span>Total</span>₹{order.totalAmount}
                                                 </div>
+
+                                                {/* Payment status badge */}
+                                                <span className={`payment-badge ${order.paymentStatus}`}>
+                                                    {order.paymentMethod?.toUpperCase()} • {order.paymentStatus === "paid" ? "✅ Paid" : order.paymentStatus === "refunded" ? "🔄 Refunded" : "⏳ Unpaid"}
+                                                </span>
+
                                                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                                                     {(order.status === "pending" || order.status === "confirmed") && (
                                                         <button
@@ -886,6 +964,21 @@ export default function UserDashboard() {
                                                     )}
                                                 </div>
                                             </div>
+
+                                            {/* OTP Box — only shown when out for delivery */}
+                                            {order.status === "out_for_delivery" && order.deliveryOTP && (
+                                                <div className="otp-card">
+                                                    <div>
+                                                        <div className="otp-label">Delivery OTP</div>
+                                                        <div className="otp-desc">
+                                                            Share this code with the delivery person to confirm receipt.
+                                                        </div>
+                                                    </div>
+                                                    <div className="otp-code">
+                                                        {order.deliveryOTP}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -1100,12 +1193,39 @@ export default function UserDashboard() {
                                 <div className="cart-total-label">Total Amount</div>
                                 <div className="cart-total-amount">₹{cartTotal}</div>
                             </div>
+
+                            {/* Payment method selector */}
+                            <div style={{ marginBottom: 14 }}>
+                                <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>Payment Method</div>
+                                <div style={{ display: "flex", gap: 10 }}>
+                                    {["cod", "upi"].map(m => (
+                                        <button
+                                            key={m}
+                                            onClick={() => setPaymentMethod(m)}
+                                            style={{
+                                                flex: 1, padding: "10px", border: `1px solid ${paymentMethod === m ? "#ff512f" : "rgba(255,255,255,0.1)"}`,
+                                                borderRadius: 12, background: paymentMethod === m ? "rgba(255,81,47,0.18)" : "rgba(255,255,255,0.04)",
+                                                color: paymentMethod === m ? "#fff" : "rgba(255,255,255,0.5)",
+                                                fontFamily: "inherit", fontWeight: 700, fontSize: 13, cursor: "pointer", transition: "all 0.2s",
+                                            }}
+                                        >
+                                            {m === "cod" ? "💵 Cash on Delivery" : "📱 UPI Payment"}
+                                        </button>
+                                    ))}
+                                </div>
+                                {paymentMethod === "upi" && (
+                                    <div style={{ marginTop: 8, fontSize: 12, color: "rgba(255,200,100,0.8)", padding: "8px 12px", background: "rgba(255,200,0,0.06)", borderRadius: 8, border: "1px solid rgba(255,200,0,0.15)" }}>
+                                        ⚡ You'll confirm payment before the order is placed.
+                                    </div>
+                                )}
+                            </div>
+
                             <button
                                 className="btn-checkout"
                                 onClick={handleCheckout}
                                 disabled={cart.length === 0 || loading}
                             >
-                                {loading ? "Placing Order..." : `Place Order • ₹${cartTotal}`}
+                                {loading ? "Processing..." : paymentMethod === "upi" ? `Pay via UPI • ₹${cartTotal}` : `Place Order (COD) • ₹${cartTotal}`}
                             </button>
                         </div>
                     </div>
@@ -1244,6 +1364,48 @@ export default function UserDashboard() {
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* UPI PAYMENT MODAL */}
+            {upiModal.show && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: 380, textAlign: "center" }}>
+                        <div style={{ fontSize: 48, marginBottom: 12 }}>📱</div>
+                        <div className="modal-title">UPI Payment</div>
+                        <div className="modal-body">
+                            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: "24px 20px", marginBottom: 20 }}>
+                                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Pay to</div>
+                                <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", marginBottom: 16 }}>FoodMenia Merchants</div>
+                                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Amount</div>
+                                <div style={{ fontSize: 32, fontWeight: 900, background: "linear-gradient(135deg,#ff512f,#f09819)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>₹{upiModal.amount}</div>
+                                <div style={{ marginTop: 20, padding: "10px", background: "rgba(255,200,0,0.08)", border: "1px dashed rgba(255,200,0,0.3)", borderRadius: 10, fontSize: 12, color: "rgba(255,220,100,0.8)" }}>
+                                    🔐 Simulated UPI transaction<br />UPI ID: foodmenia@okaxis
+                                </div>
+                            </div>
+                            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>
+                                Tap <strong style={{ color: "#fff" }}>Confirm Payment</strong> to simulate completing the UPI transaction.
+                                Your order will be placed and marked as paid instantly.
+                            </p>
+                        </div>
+                        <div className="modal-actions" style={{ gap: 10 }}>
+                            <button
+                                className="btn-icon"
+                                onClick={() => { setUpiModal({ show: false, orderId: null, amount: 0 }); setPendingCheckoutData(null); }}
+                                disabled={loading}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn-primary"
+                                onClick={handleUpiConfirm}
+                                disabled={loading}
+                                style={{ flex: 1 }}
+                            >
+                                {loading ? "Processing..." : "✅ Confirm Payment"}
+                            </button>
                         </div>
                     </div>
                 </div>

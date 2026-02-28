@@ -32,8 +32,8 @@ export default function CreatorDashboard() {
     const [editReel, setEditReel] = useState(null); // { _id, title, description }
     const [editSaving, setEditSaving] = useState(false);
 
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const token = localStorage.getItem("token");
+    const user = JSON.parse(localStorage.getItem(CONFIG.dataKey("creator")) || "{}");
+    const token = localStorage.getItem(CONFIG.tokenKey("creator"));
 
     useEffect(() => {
         const saved = localStorage.getItem("creatorProfilePic");
@@ -178,7 +178,7 @@ export default function CreatorDashboard() {
             if (data.success) {
                 setCreatorBio(data.data.creatorBio);
                 const updatedUser = { ...user, creatorBio: data.data.creatorBio };
-                localStorage.setItem("user", JSON.stringify(updatedUser));
+                localStorage.setItem(CONFIG.dataKey("creator"), JSON.stringify(updatedUser));
                 setIsEditingBio(false);
             } else {
                 alert(data.message);
@@ -334,7 +334,12 @@ export default function CreatorDashboard() {
                     </button>
                 </nav>
 
-                <button className="cd-logout" onClick={() => { localStorage.clear(); navigate("/"); }}>
+                <button className="cd-logout" onClick={() => {
+                    localStorage.removeItem(CONFIG.tokenKey("creator"));
+                    localStorage.removeItem(CONFIG.dataKey("creator"));
+                    localStorage.removeItem("creatorProfilePic");
+                    navigate("/");
+                }}>
                     <span>🚪</span> Logout
                 </button>
             </aside>

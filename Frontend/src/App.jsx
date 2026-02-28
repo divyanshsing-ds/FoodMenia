@@ -4,10 +4,11 @@ import AuthPage from "./Pages/AuthPage";
 import OperatorDashboard from "./Pages/OperatorDashboard";
 import UserDashboard from "./Pages/UserDashboard";
 import CreatorDashboard from "./Pages/CreatorDashboard";
+import CONFIG from "./utils/config";
 
 function ProtectedRoute({ children, allowedRole }) {
-  const token = localStorage.getItem("token");
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const token = localStorage.getItem(CONFIG.tokenKey(allowedRole));
+  const user = JSON.parse(localStorage.getItem(CONFIG.dataKey(allowedRole)) || "{}");
 
   if (!token) return <Navigate to="/" replace />;
   if (allowedRole && user.role !== allowedRole) return <Navigate to="/" replace />;
@@ -17,9 +18,11 @@ function ProtectedRoute({ children, allowedRole }) {
 
 function App() {
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const user = localStorage.getItem("user");
-    console.log("🛠️ App Init - Token:", token ? "Exists" : "MISSING", "User:", user ? JSON.parse(user).role : "NONE");
+    ["user", "operator", "creator"].forEach((role) => {
+      const t = localStorage.getItem(CONFIG.tokenKey(role));
+      const u = localStorage.getItem(CONFIG.dataKey(role));
+      if (t) console.log(`🛠️ Session [${role}] - Token: Exists | User:`, u ? JSON.parse(u).role : "NONE");
+    });
   }, []);
 
   return (

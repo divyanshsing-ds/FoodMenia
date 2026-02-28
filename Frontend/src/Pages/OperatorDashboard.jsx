@@ -28,10 +28,11 @@ export default function OperatorDashboard() {
     const [profitTimeframe, setProfitTimeframe] = useState("month");
     const [customDates, setCustomDates] = useState({ start: "", end: "" });
     const [reviewPanel, setReviewPanel] = useState({ show: false, item: null });
+    const [otpInput, setOtpInput] = useState({}); // keyed by orderId
     const knownOrderIds = useRef(new Set());
 
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const token = localStorage.getItem("token");
+    const user = JSON.parse(localStorage.getItem(CONFIG.dataKey("operator")) || "{}");
+    const token = localStorage.getItem(CONFIG.tokenKey("operator"));
 
     const showToast = (type, text) => {
         setToast({ type, text });
@@ -174,20 +175,51 @@ export default function OperatorDashboard() {
 
 
     // Update order status
-    const handleUpdateStatus = async (orderId, status, rejectionReason = "") => {
+    const handleUpdateStatus = async (orderId, newStatus) => {
         try {
             const res = await fetch(`${CONFIG.API_BASE}/orders/${orderId}/status`, {
                 method: "PUT",
                 headers: { ...authHeaders(), "Content-Type": "application/json" },
-                body: JSON.stringify({ status, rejectionReason }),
+                body: JSON.stringify({ status: newStatus }),
             });
             const data = await res.json();
             if (data.success) {
-                showToast("success", `Order ${status.replace(/_/g, " ")}!`);
-                fetchOrders();
+                showToast("success", `Order marked as ${newStatus.replace(/_/g, " ")}`);
+                fetchOrders(true);
+            } else {
+                showToast("error", data.message || "Failed to update status");
             }
         } catch {
-            showToast("error", "Failed to update order status");
+            showToast("error", "Failed to update status");
+        }
+    };
+
+    // Verify OTP and mark order as delivered
+    const handleVerifyOtp = async (orderId) => {
+        const otp = otpInput[orderId] || "";
+        if (!otp || otp.length !== 4) {
+            showToast("error", "Please enter the 4-digit OTP.");
+            return;
+        }
+        setLoading(true);
+        try {
+            const res = await fetch(`${CONFIG.API_BASE}/orders/${orderId}/verify-otp`, {
+                method: "POST",
+                headers: { ...authHeaders(), "Content-Type": "application/json" },
+                body: JSON.stringify({ otp }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast("success", "✅ Delivery confirmed! Payment collected.");
+                setOtpInput(prev => { const n = { ...prev }; delete n[orderId]; return n; });
+                fetchOrders(true);
+            } else {
+                showToast("error", data.message || "Invalid OTP");
+            }
+        } catch {
+            showToast("error", "OTP verification failed");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -243,8 +275,8 @@ export default function OperatorDashboard() {
     };
 
     const handleLogout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        localStorage.removeItem(CONFIG.tokenKey("operator"));
+        localStorage.removeItem(CONFIG.dataKey("operator"));
         navigate("/");
     };
 
@@ -780,7 +812,40 @@ export default function OperatorDashboard() {
                                                 <div className="order-total">
                                                     <span>Total</span>₹{order.totalAmount}
                                                 </div>
-                                                {getNextStatus(order.status) && (
+
+                                                {/* Payment badge */}
+                                                <span className={`payment-badge ${order.paymentStatus}`}>
+                                                    {order.paymentMethod?.toUpperCase()} • {order.paymentStatus === "paid" ? "✅ Paid" : order.paymentStatus === "refunded" ? "🔄 Refunded" : "⏳ Unpaid"}
+                                                </span>
+
+                                                {/* OTP input for out_for_delivery */}
+                                                {order.status === "out_for_delivery" ? (
+                                                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                                                        <input
+                                                            type="text"
+                                                            maxLength={4}
+                                                            placeholder="Enter OTP from customer"
+                                                            value={otpInput[order._id] || ""}
+                                                            onChange={e => setOtpInput(prev => ({ ...prev, [order._id]: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
+                                                            className="otp-input-field"
+                                                            style={{
+                                                                width: 140, padding: "9px 12px", borderRadius: 10,
+                                                                background: "rgba(255,255,255,0.05)",
+                                                                border: "1px solid rgba(255,255,255,0.1)",
+                                                                color: "#fff", fontSize: 14, letterSpacing: 3, fontWeight: 700,
+                                                                textAlign: "center"
+                                                            }}
+                                                        />
+                                                        <button
+                                                            className="btn-confirm"
+                                                            onClick={() => handleVerifyOtp(order._id)}
+                                                            disabled={loading}
+                                                            style={{ padding: "9px 18px" }}
+                                                        >
+                                                            📦 Verify & Deliver
+                                                        </button>
+                                                    </div>
+                                                ) : getNextStatus(order.status) && (
                                                     <button
                                                         className="btn-status"
                                                         onClick={() => handleUpdateStatus(order._id, getNextStatus(order.status))}

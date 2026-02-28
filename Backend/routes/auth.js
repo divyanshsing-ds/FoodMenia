@@ -40,9 +40,14 @@ router.post("/signup", async (req, res) => {
 
         const Model = getModel(role);
 
-        // check if email already exists in this collection
-        const existing = await Model.findOne({ email });
-        if (existing) {
+        // ─── Check email uniqueness across ALL collections ───────
+        // Prevents the same email from existing in User + Operator + Creator
+        const [existingUser, existingCreator, existingOperator] = await Promise.all([
+            User.findOne({ email }),
+            Creator.findOne({ email }),
+            Operator.findOne({ email }),
+        ]);
+        if (existingUser || existingCreator || existingOperator) {
             return res.status(409).json({ success: false, message: "An account with this email already exists." });
         }
 
@@ -90,32 +95,29 @@ router.post("/signup", async (req, res) => {
 
 // ========================================================
 //  POST  /api/auth/login
+//  Requires `role` in the body — only looks in the right
+//  collection, so an operator can never accidentally log
+//  in as a user or vice-versa.
 // ========================================================
 router.post("/login", async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, role } = req.body;
 
         if (!email || !password) {
             return res.status(400).json({ success: false, message: "Email and password are required." });
         }
-
-        // Search across all three collections
-        let user = await User.findOne({ email });
-        let role = "user";
-
-        if (!user) {
-            user = await Creator.findOne({ email });
-            role = "creator";
+        if (!role || !["user", "creator", "operator"].includes(role)) {
+            return res.status(400).json({ success: false, message: "A valid role (user / creator / operator) is required." });
         }
-        if (!user) {
-            user = await Operator.findOne({ email });
-            role = "operator";
-        }
+
+        // Look ONLY in the collection that matches the selected role
+        const Model = getModel(role);
+        const user = await Model.findOne({ email });
+
         if (!user) {
             return res.status(401).json({ success: false, message: "Invalid email or password." });
         }
 
-        // compare password
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(401).json({ success: false, message: "Invalid email or password." });
@@ -124,11 +126,7 @@ router.post("/login", async (req, res) => {
         // Generate JWT token
         const tokenPayload = { id: user._id, fullName: user.fullName, email: user.email, role };
         if (role === "operator") tokenPayload.restaurantName = user.restaurantName;
-        const token = jwt.sign(
-            tokenPayload,
-            JWT_SECRET,
-            { expiresIn: "7d" }
-        );
+        const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: "7d" });
 
         return res.status(200).json({
             success: true,
