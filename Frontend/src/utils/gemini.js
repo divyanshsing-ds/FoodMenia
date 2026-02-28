@@ -32,7 +32,7 @@ export async function generateReelDescription(title) {
 /**
  * Get nutrition breakdown for a list of ordered food items.
  * @param {Array<{name: string, quantity: number}>} items
- * @returns {Promise<string>} Formatted nutrition info
+ * @returns {Promise<string>}
  */
 export async function getNutritionInfo(items) {
     const itemList = items.map(i => `${i.quantity}x ${i.name}`).join(", ");

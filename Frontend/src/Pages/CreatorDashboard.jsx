@@ -35,16 +35,26 @@ export default function CreatorDashboard() {
     const user = JSON.parse(localStorage.getItem(CONFIG.dataKey("creator")) || "{}");
     const token = localStorage.getItem(CONFIG.tokenKey("creator"));
 
+    // Dynamic key for persistent profile pic per user
+    const picKey = `creatorProfilePic_${user.id || 'anonymous'}`;
+
     useEffect(() => {
-        const saved = localStorage.getItem("creatorProfilePic");
+        const saved = localStorage.getItem(picKey);
         if (saved) setProfilePic(saved);
-    }, []);
+    }, [picKey]);
 
     useEffect(() => {
         setCreatorBio(user.creatorBio || "");
         fetchMyReels();
         fetchRestaurants();
     }, []);
+
+    // ─── Session Protection ───
+    useEffect(() => {
+        if (!token || user.role !== "creator") {
+            navigate("/");
+        }
+    }, [token, user.role, navigate]);
 
 
 
@@ -105,7 +115,7 @@ export default function CreatorDashboard() {
         const reader = new FileReader();
         reader.onload = (ev) => {
             setProfilePic(ev.target.result);
-            localStorage.setItem("creatorProfilePic", ev.target.result);
+            localStorage.setItem(picKey, ev.target.result);
         };
         reader.readAsDataURL(file);
     };
@@ -337,7 +347,7 @@ export default function CreatorDashboard() {
                 <button className="cd-logout" onClick={() => {
                     localStorage.removeItem(CONFIG.tokenKey("creator"));
                     localStorage.removeItem(CONFIG.dataKey("creator"));
-                    localStorage.removeItem("creatorProfilePic");
+                    // We DO NOT remove the picKey here, so it persists when they log back in
                     navigate("/");
                 }}>
                     <span>🚪</span> Logout
