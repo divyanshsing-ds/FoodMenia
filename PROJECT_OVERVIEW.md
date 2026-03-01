@@ -26,7 +26,7 @@ FoodMenia is a high-performance **MERN** (MongoDB, Express, React, Node.js) plat
 ### **Database & AI**
 - **Database**: `MongoDB` (NoSQL Document Store)
 - **ORM**: `Mongoose` (Schema validation & data modeling)
-- **AI Engine**: `Google Gemini AI (gemini-1.5-flash)` (Natural language processing)
+- **AI Engine**: `Google Gemini AI (gemini-2.5-flash)` (Natural language processing)
 
 ---
 
