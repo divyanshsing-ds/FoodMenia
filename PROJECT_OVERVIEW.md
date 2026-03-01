@@ -1,78 +1,95 @@
-# 🍕 FoodMenia - Project Overview & Roadmap
+# 🍕 FoodMenia - Ultimate Project Master File
 
-FoodMenia is a multi-role food delivery and content platform built with the **MERN** stack (MongoDB, Express, React, Node.js). It uniquely combines traditional food ordering with a social "Reels" component for food creators.
-
----
-
-## 🏗️ 1. Project Architecture
-
-### **Backend (`/Backend`)**
-- **Server**: Express.js server running on port `9090`.
-- **Database**: MongoDB (via Mongoose) with models for `User`, `Operator`, `MenuItem`, `Order`, and `Video`.
-- **Auth**: JWT-based authentication with a shared secret `MYFOOD`.
-- **Storage**: Local file storage in `/uploads` for menu images and `/uploads/reels` for videos (using Multer).
-
-### **Frontend (`/Frontend`)**
-- **Framework**: React with Vite.
-- **Routing**: `react-router-dom` with protected routes based on user roles.
-- **Styling**: Vanilla CSS with a focus on modern, dark-themed dashboard aesthetics.
+FoodMenia is a high-performance **MERN** (MongoDB, Express, React, Node.js) platform that bridges the gap between traditional food delivery and social media. It serves three distinct user bases through a unified, role-aware dashboard system.
 
 ---
 
-## 🔄 2. Transactional & Data Flows
+## 🛠️ 1. Complete Technology Stack
 
-### **A. User Roles & Permissions**
-1.  **User**: Browses menu, watches reels, places orders, and rates items.
-2.  **Operator**: Manages restaurant menu, accepts/rejects orders, and views financial analytics.
-3.  **Creator**: Uploads food reels, associates them with restaurants, and tracks engagement/earnings.
+### **Frontend Architecture**
+- **Core Library**: `React 19.x` (Component-based UI)
+- **Build Tool**: `Vite 8.0` (Ultra-fast development & bundling)
+- **Routing**: `React Router 7.x` (Role-based protected route management)
+- **Styling**: `Vanilla CSS3` (Custom-built design system with modern CSS variables)
+- **State Management**: `React Hooks` (`useState`, `useEffect`, `useCallback`, `useMemo`, `useRef`)
+- **PDF Engine**: `jsPDF` & `jsPDF-AutoTable` (For dynamic invoice generation)
+- **Icons**: Emoji Glyphs (Optimized for performance and universal support)
 
-### **B. Order Lifecycle**
-`Pending` -> `Confirmed` -> `Preparing` -> `Out for Delivery` -> `Delivered`
-*   *Note: Users can request cancellations, and Operators can approve/deny them.*
+### **Backend Architecture**
+- **Runtime**: `Node.js` (LTS)
+- **Framework**: `Express.js` (RESTful API architecture)
+- **Authentication**: `JSON Web Tokens (JWT)` (Secure stateless auth)
+- **Security**: `Bcryptjs` (Password hashing)
+- **File Handling**: `Multer` (Disk-storage engine for media uploads)
+- **Middleware**: `CORS`, `Express.json`, `Dotenv`, `Custom Request Loggers`
 
-### **C. The "Reel" Ecosystem**
-- **Creators** upload videos and link them to a specific **Operator's** restaurant.
-- **Users** watch reels in a TikTok-style feed.
-- **Analytics**: Creators earn "Estimated Revenue" based on a formula involving views and likes.
-
----
-
-## 📈 3. Key Features Recently Implemented
-- **Financial Analytics**: Operators can view revenue, platform fees (5%), and download a premium PDF invoice.
-- **Review System**: Users can rate items they've bought; Operators can "Like" and "Reply" to these reviews.
-- **AI Integration**: Creators can auto-generate reel descriptions using Google's Gemini AI.
-- **Toast Notifications**: Modern, non-intrusive alerts for order updates and status changes.
-
----
-
-## 🛠️ 4. Immediate Technical Debt (Useless/Suboptimal Code)
-*Based on recent analysis:*
-- **Unused `roleMiddleware`**: Defined in `auth.js` but not utilized in routes.
-- **Redundant Auth Checks**: Dashboards perform manual role checks that are already handled by `ProtectedRoute` in `App.jsx`.
-- **Hardcoded API URLs**: `http://localhost:9090/api` is repeated across multiple frontend files.
-- **Model Bloat**: `MenuItem` contains a `restaurantImage` field that is never used.
+### **Database & AI**
+- **Database**: `MongoDB` (NoSQL Document Store)
+- **ORM**: `Mongoose` (Schema validation & data modeling)
+- **AI Engine**: `Google Gemini AI (gemini-1.5-flash)` (Natural language processing)
 
 ---
 
-## 🚀 5. What to Do Next (Roadmap)
+## 🛡️ 2. Security & Data Integrity Features
 
-### **Phase 1: Stabilization & Cleanup (High Priority)**
-1.  **Refactor Config**: Create a `src/utils/config.js` to store `API_BASE` and use it globally.
-2.  **Route Protection**: Use `roleMiddleware` in the backend routes to clean up the `if (req.user.role !== '...')` blocks.
-3.  **Image Optimization**: Implement logic to delete old images/videos from the server when an item is deleted or updated.
-
-### **Phase 2: Feature Enhancements**
-1.  **Live Order Tracking**: Implement WebSockets (Socket.io) so users see order status changes in real-time without reloading.
-2.  **Creator-Restaurant Collaboration**: Allow Operators to "Approve" reels before they appear on their restaurant's profile.
-3.  **Search & Filters**: Add global search for restaurants and categories on the User Dashboard.
-
-### **Phase 3: Production Readiness**
-1.  **Environment Variables**: Ensure all secrets (JWT, MongoDB URI) are moved entirely to `.env` (already started, but needs verification).
-2.  **Global Loading States**: Replace per-page `loading` states with a global progress bar or skeleton screens for a more premium feel.
+- **Multi-Role Session Isolation**: Uses role-specific localStorage keys (`userToken`, `operatorToken`, etc.) to support 3 parallel logins in one browser.
+- **Role-Based Guards**: Sequential backend `authMiddleware` + `roleMiddleware` preventing unauthorized API access.
+- **Environment Shield**: Strict `.env` management with `.env.example` templates for deployment.
+- **History Redaction**: Custom Git history purging to remove leaked secrets and sensitive data.
+- **Storage Cleanup**: Persistent `fs.unlink` logic to delete physical files (images/videos) when database records are removed.
+- **Email Collision Check**: Global signup validation ensuring an email cannot be reused across different roles.
 
 ---
 
-> [!TIP]
-> **To start the project:**
-> 1.  Backend: `cd Backend && npm start`
-> 2.  Frontend: `cd Frontend && npm run dev`
+## ✨ 3. Comprehensive Feature List by Role
+
+### **A. Customer (User) Features**
+- **TikTok-Style Reels**: Infinite scroll feed of food videos from creators.
+- **Social Interaction**: Like reels, read comments, and reply to creation threads.
+- **Dynamic Menu**: Real-time menu browsing with instant Veg/Non-Veg/Both filters.
+- **Search System**: Global search for specific dishes or restaurants.
+- **AI Nutritionist**: One-click analysis of the shopping cart to estimate Calories, Protein, Carbs, and Fats.
+- **Dual Payment Flow**: 
+    - **COD**: Direct placing with instant UI updates.
+    - **UPI**: Simulated secure gateway that verifies order ownership before processing.
+- **Live Order Stepper**: 5-stage visual progress bar (Pending → Confirmed → Preparing → Out for Delivery → Delivered).
+- **Secure Handover**: Dynamic 4-digit OTP generated for the user to share with the delivery partner.
+- **Review Engine**: Star-rating system for food items with text reviews.
+
+### **B. Restaurant Owner (Operator) Features**
+- **Pro Menu Manager**: Upload dish photos, set dynamic prices, and toggle availability.
+- **Order Command Center**: Real-time dashboard to Accept/Reject/Update orders.
+- **Financial Analytics**: 
+    - Gross Sales vs. Net Earnings tracking.
+    - Automated Platform Fee calculation (5%).
+    - Daily/Weekly/Monthly revenue summaries.
+- **Invoice System**: Generate and download professional PDF invoices for every order.
+- **Security Gate**: Delivery status is blocked until the Customer's OTP is verified.
+- **Customer Engagement**: Like and reply to user reviews directly from the dashboard.
+- **Cancellation Management**: Review and approve/deny user cancellation requests.
+
+### **C. Content Creator (Creator) Features**
+- **Video Workshop**: High-speed video ingestion via Multer for high-res reels.
+- **Store Linking**: Ability to associate specific reels with physical restaurant IDs.
+- **AI Content Assistant**: Auto-generates mouth-watering captions/descriptions using Gemini AI.
+- **Earnings Tracker**: Real-time revenue estimation based on a formula of (Views/20) + (Likes/100).
+- **Profile Persistence**: Custom Bio and user-specific Profile Picture that survives reloads.
+
+---
+
+## 🔄 4. Order & Payment Lifecycle
+
+1.  **Placement**: Selection between **Cash on Delivery (COD)** or **UPI Simluation**.
+2.  **UPI Flow**: User completes a simulated payment; backend verifies ownership before processing.
+3.  **Kitchen Processing**: Operator moves status from `Pending` → `Confirmed` → `Preparing`.
+4.  **Delivery Verification**: System generates a 4-digit OTP shown only to the customer.
+5.  **Completion**: Operator must enter the customer's OTP to mark the order as `Delivered`.
+6.  **Refunds**: Automatic `Refunded` status update if a paid order is rejected or cancelled.
+
+---
+
+## 🚀 5. Current Production Readiness
+- **Frontend Build**: Vite-optimized production assets ready.
+- **Backend API**: Structured error handling with `try/catch` and status code precision.
+- **Mobile Responsive**: Flexbox/Grid based design compatible with all screen sizes.
+- **UX/UI**: Premium **Dark Theme** with Outfit typography and glassmorphism.
