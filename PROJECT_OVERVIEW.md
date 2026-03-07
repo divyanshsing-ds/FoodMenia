@@ -4,6 +4,49 @@ FoodMenia is a high-performance **MERN** (MongoDB, Express, React, Node.js) plat
 
 ---
 
+## 🏗️ System Architecture
+
+```mermaid
+graph TD
+    %% User Roles
+    Customer[👤 Customer] -->|Views Reels, Orders Food, ID Verify| Frontend
+    Operator[👨‍🍳 Operator] -->|Manages Menu, Handles Orders| Frontend
+    Creator[🎥 Creator] -->|Uploads Food Reels, Tracks Views| Frontend
+
+    %% Client Layer
+    subgraph Client [Frontend Layer]
+        Frontend[📱 React 19 SPA Vite]
+        UI[Tailored Role Dashboards]
+        Frontend --- UI
+    end
+
+    %% Network
+    Frontend -- REST API & JWT Auth --> Backend
+
+    %% Server Layer
+    subgraph AppServer [Backend Express App]
+        Backend[⚙️ Node.js + Express API]
+        Auth[Security: JWT & Role Guards]
+        Modules[Modules: Orders, Menu, Videos, AI]
+        Backend --- Auth
+        Backend --- Modules
+    end
+
+    %% Data & External Services
+    subgraph Persistence & AI [Data & AI Layer]
+        DB[(🍃 MongoDB Data Store)]
+        Gemini[🤖 Google Gemini AI]
+        Storage[💾 Multer Local System]
+    end
+
+    %% Backend connections
+    Backend -->|Mongoose ODM| DB
+    Backend -->|Vision/Text Prompts| Gemini
+    Backend -->|Media File Uploads| Storage
+```
+
+---
+
 ## 🛠️ 1. Complete Technology Stack
 
 ### **Frontend Architecture**
