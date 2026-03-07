@@ -32,7 +32,7 @@ FoodMenia is a high-performance **MERN** (MongoDB, Express, React, Node.js) plat
 
 ---
 
-## � 2. Data Models
+## 2. Data Models
 
 | Model | Key Fields |
 |---|---|
