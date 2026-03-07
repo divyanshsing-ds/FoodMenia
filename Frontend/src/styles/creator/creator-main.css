@@ -1,0 +1,104 @@
+/* creator-main.css */
+.cd-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow-y: auto;
+    height: 100vh;
+}
+
+.cd-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4) var(--space-8);
+    background: var(--bg-glass);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    backdrop-filter: blur(20px);
+}
+
+.cd-welcome {
+    font-size: 17px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.cd-welcome strong {
+    color: #fff;
+    font-weight: 800;
+}
+
+.cd-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.cd-reel-count {
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 4px 14px;
+    border-radius: 20px;
+    letter-spacing: 0.4px;
+}
+
+.cd-content {
+    padding: var(--space-8);
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    flex: 1;
+}
+
+.cd-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+}
+
+.cd-section-title {
+    font-size: var(--fs-3xl);
+    font-weight: var(--fw-black);
+    color: var(--text-primary);
+    font-family: var(--font-heading);
+    letter-spacing: -0.5px;
+}
+
+.cd-btn-upload {
+    padding: var(--space-2) var(--space-6);
+    border: none;
+    border-radius: var(--radius-md);
+    background: var(--brand-gradient);
+    color: var(--text-primary);
+    font-family: var(--font-heading);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-bold);
+    cursor: pointer;
+    box-shadow: var(--shadow-sm), 0 4px 15px rgba(255, 81, 47, 0.3);
+    transition: var(--transition);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.cd-btn-upload:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow:
+        0 10px 25px rgba(255, 81, 47, 0.45),
+        0 2px 0 rgba(255, 255, 255, 0.3) inset;
+    background-position: right center;
+}
+
+.cd-btn-upload:active {
+    transform: translateY(-1px) scale(0.98);
+}

@@ -7,14 +7,36 @@ const fs = require("fs");
 const path = require("path");
 
 // =====================================================
-//  FETCH ALL VIDEOS (Feed)
+//  FETCH ALL VIDEOS (Feed) - randomised
 //  /api/video/feed
 // =====================================================
 router.get("/feed", async (req, res) => {
     try {
         const videos = await Video.find()
             .populate("restaurantId", "restaurantName restaurantLocation")
-            .populate("creatorId", "fullName")
+            .populate("creatorId", "fullName profilePic");
+
+        // Shuffle for a fresh experience each load (Fisher-Yates)
+        for (let i = videos.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [videos[i], videos[j]] = [videos[j], videos[i]];
+        }
+
+        res.json({ success: true, data: videos });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// =====================================================
+//  FETCH VIDEOS BY CREATOR (Public Profile)
+//  /api/video/creator/:creatorId
+// =====================================================
+router.get("/creator/:creatorId", async (req, res) => {
+    try {
+        const videos = await Video.find({ creatorId: req.params.creatorId })
+            .populate("restaurantId", "restaurantName restaurantLocation")
+            .populate("creatorId", "fullName profilePic creatorBio")
             .sort({ createdAt: -1 });
 
         res.json({ success: true, data: videos });
@@ -51,16 +73,12 @@ router.post("/upload", authMiddleware, roleMiddleware("creator"), upload.single(
 
         const { title, description, restaurantId } = req.body;
 
-        if (!title || !restaurantId) {
-            return res.status(400).json({ success: false, message: "Title and Restaurant are required" });
-        }
-
         const newVideo = new Video({
             title,
             description,
             videoUrl: `/uploads/reels/${req.file.filename}`,
             creatorId: req.user.id,
-            restaurantId,
+            restaurantId: restaurantId || null,
         });
 
         await newVideo.save();

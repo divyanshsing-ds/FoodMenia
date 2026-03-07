@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import "../styles/dashboard.css";
+import OperatorCreatorChat from "../components/OperatorCreatorChat";
 
 import CONFIG from "../utils/config";
 
@@ -19,6 +20,7 @@ export default function OperatorDashboard() {
         description: "",
         price: "",
         category: "General",
+        foodType: "veg",
     });
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
@@ -44,15 +46,24 @@ export default function OperatorDashboard() {
     }), [token]);
 
     // Fetch menu items
-    const fetchMenu = useCallback(async () => {
+    const fetchMenu = useCallback(async (isSilent = false) => {
         try {
             const res = await fetch(`${CONFIG.API_BASE}/menu/my?t=${Date.now()}`, { headers: authHeaders() });
             const data = await res.json();
-            if (data.success) setMenuItems(data.data);
+            if (data.success) {
+                setMenuItems(data.data);
+                // Also update the review panel item if it's currently open
+                if (reviewPanel?.show && reviewPanel?.item) {
+                    const updatedItem = data.data.find(i => i._id === reviewPanel.item._id);
+                    if (updatedItem) {
+                        setReviewPanel(prev => ({ ...prev, item: updatedItem }));
+                    }
+                }
+            }
         } catch {
-            showToast("error", "Failed to load menu items");
+            if (!isSilent) showToast("error", "Failed to load menu items");
         }
-    }, [authHeaders]);
+    }, [authHeaders, reviewPanel?.show, reviewPanel?.item]);
 
     // Fetch orders
     const fetchOrders = useCallback(async (isSilent = false) => {
@@ -81,7 +92,10 @@ export default function OperatorDashboard() {
         fetchMenu();
         fetchOrders();
         // Poll orders every 15s
-        const interval = setInterval(() => fetchOrders(true), 15000);
+        const interval = setInterval(() => {
+            fetchOrders(true);
+            fetchMenu(true);
+        }, 5000);
         return () => clearInterval(interval);
     }, [token, user.role, navigate, fetchMenu, fetchOrders]);
 
@@ -96,16 +110,11 @@ export default function OperatorDashboard() {
             fd.append("description", formData.description);
             fd.append("price", formData.price);
             fd.append("category", formData.category);
-            const url = editingItem ? `${CONFIG.API_BASE}/menu/${editingItem._id}` : `${CONFIG.API_BASE}/menu`;
-
+            fd.append("foodType", formData.foodType);
             if (imageFile) {
-                console.log("📎 Appending new image file:", imageFile.name);
                 fd.append("image", imageFile);
-            } else {
-                console.log("ℹ️ No new image selected, keeping current.");
             }
-
-            console.log("📤 Sending update to:", url);
+            const url = editingItem ? `${CONFIG.API_BASE}/menu/${editingItem._id}` : `${CONFIG.API_BASE}/menu`;
             const method = editingItem ? "PUT" : "POST";
 
             const res = await fetch(url, {
@@ -120,10 +129,12 @@ export default function OperatorDashboard() {
                 handleCancelEdit();
                 fetchMenu();
             } else {
-                showToast("error", data.message);
+                console.warn("API Error:", data.message, data.error);
+                showToast("error", data.error || data.message || "Operation failed");
             }
-        } catch {
-            showToast("error", `Failed to ${editingItem ? "update" : "add"} menu item`);
+        } catch (err) {
+            console.error("Submission Error:", err);
+            showToast("error", `Failed to ${editingItem ? "update" : "add"} menu item. Check console.`);
         } finally {
             setLoading(false);
         }
@@ -135,7 +146,8 @@ export default function OperatorDashboard() {
             name: item.name,
             description: item.description,
             price: item.price,
-            category: item.category || "General"
+            category: item.category || "General",
+            foodType: item.foodType || "veg"
         });
         setImagePreview(item.image ? `${CONFIG.UPLOADS_BASE}${item.image}` : null);
         setShowAddForm(true);
@@ -253,8 +265,11 @@ export default function OperatorDashboard() {
                 showToast("success", "Reply sent!");
                 setMenuItems(prev => prev.map(item => item._id === itemId ? data.data : item));
                 setReviewPanel(prev => ({ ...prev, item: data.data }));
+            } else {
+                showToast("error", data.message || "Failed to send reply");
             }
-        } catch {
+        } catch (err) {
+            console.error("Reply Error:", err);
             showToast("error", "Failed to send reply");
         }
     };
@@ -262,12 +277,10 @@ export default function OperatorDashboard() {
     // Image handler
     const handleImageChange = (e) => {
         const file = e.target.files[0];
-        console.log("📁 File selected:", file ? file.name : "None");
         if (file) {
             setImageFile(file);
             const reader = new FileReader();
             reader.onloadend = () => {
-                console.log("🖼️ Image preview generated");
                 setImagePreview(reader.result);
             };
             reader.readAsDataURL(file);
@@ -282,7 +295,7 @@ export default function OperatorDashboard() {
 
     const handleDownloadInvoice = (filteredOrders, stats) => {
         const doc = new jsPDF();
-        const { grossRevenue, platformFee, netProfit, timeframe } = stats;
+        const { grossRevenue, platformFee, netProfit, totalStudentDiscounts, timeframe } = stats;
 
         // --- 1. PREMIUM HEADER ---
         // Dark Top Bar
@@ -340,43 +353,55 @@ export default function OperatorDashboard() {
         doc.setTextColor(31, 41, 55);
         doc.text("EXECUTIVE SUMMARY", 15, 110);
 
-        // Gross Card
+        // Student Discount Card (New)
         doc.setFillColor(255, 255, 255);
         doc.setDrawColor(229, 231, 235);
-        doc.roundedRect(15, 115, 55, 35, 2, 2, 'DF');
-        doc.setFillColor(255, 81, 47); // Orange dot
-        doc.circle(22, 122, 1.5, 'F');
+        doc.roundedRect(15, 115, 42, 35, 2, 2, 'DF');
+        doc.setFillColor(34, 197, 94); // Green dot
+        doc.circle(20, 122, 1.2, 'F');
         doc.setTextColor(107, 114, 128);
-        doc.setFontSize(8);
-        doc.text("GROSS REVENUE", 26, 123);
+        doc.setFontSize(7);
+        doc.text("GROSS REV", 24, 123);
         doc.setTextColor(31, 41, 55);
-        doc.setFontSize(14);
-        doc.text(`Rs. ${grossRevenue.toLocaleString()}`, 22, 138);
+        doc.setFontSize(11);
+        doc.text(`Rs. ${grossRevenue.toLocaleString()}`, 20, 138);
+
+        // Student Offer Card
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(61, 115, 42, 35, 2, 2, 'DF');
+        doc.setFillColor(255, 81, 47); // Orange dot
+        doc.circle(66, 122, 1.2, 'F');
+        doc.setTextColor(107, 114, 128);
+        doc.setFontSize(7);
+        doc.text("STUDENT OFF", 70, 123);
+        doc.setTextColor(255, 81, 47);
+        doc.setFontSize(11);
+        doc.text(`Rs. ${totalStudentDiscounts.toLocaleString()}`, 66, 138);
 
         // Fee Card
         doc.setFillColor(255, 255, 255);
-        doc.roundedRect(77, 115, 55, 35, 2, 2, 'DF');
+        doc.roundedRect(107, 115, 42, 35, 2, 2, 'DF');
         doc.setFillColor(189, 147, 249); // Purple dot
-        doc.circle(84, 122, 1.5, 'F');
+        doc.circle(112, 122, 1.2, 'F');
         doc.setTextColor(107, 114, 128);
-        doc.setFontSize(8);
-        doc.text("PLATFORM FEE (5%)", 88, 123);
+        doc.setFontSize(7);
+        doc.text("FEE (5%)", 116, 123);
         doc.setTextColor(189, 147, 249);
-        doc.setFontSize(14);
-        doc.text(`Rs. ${platformFee.toLocaleString()}`, 84, 138);
+        doc.setFontSize(11);
+        doc.text(`Rs. ${platformFee.toLocaleString()}`, 112, 138);
 
         // Net Card
-        doc.setFillColor(240, 253, 244); // Light green bg
-        doc.setDrawColor(34, 197, 94); // Green border
-        doc.roundedRect(139, 115, 56, 35, 2, 2, 'DF');
-        doc.setFillColor(34, 197, 94); // Green dot
-        doc.circle(146, 122, 1.5, 'F');
+        doc.setFillColor(240, 253, 244);
+        doc.setDrawColor(34, 197, 94);
+        doc.roundedRect(153, 115, 42, 35, 2, 2, 'DF');
+        doc.setFillColor(34, 197, 94);
+        doc.circle(158, 122, 1.2, 'F');
         doc.setTextColor(21, 128, 61);
-        doc.setFontSize(8);
-        doc.text("NET PAYOUT", 150, 123);
-        doc.setFontSize(16);
+        doc.setFontSize(7);
+        doc.text("NET PAYOUT", 162, 123);
+        doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        doc.text(`Rs. ${netProfit.toLocaleString()}`, 146, 138);
+        doc.text(`Rs. ${netProfit.toLocaleString()}`, 158, 138);
 
         // --- 4. ORDER BREAKDOWN TABLE ---
         doc.setFontSize(12);
@@ -385,8 +410,11 @@ export default function OperatorDashboard() {
         doc.text("DETAILED ORDER BREAKDOWN", 15, 165);
 
         const tableData = filteredOrders.map(o => [
-            `#${o._id.slice(-8).toUpperCase()}`,
-            o.items.map(item => `${item.name} (${item.quantity})`).join(", "),
+            `#${o._id.slice(-8).toUpperCase()}${o.studentDiscountApplied ? " (STUDENT)" : ""}`,
+            o.items.map(item => {
+                const bestSellerMark = menuItems.find(m => m._id === item.menuItemId?.toString() || m.name === item.name)?.isBestSeller;
+                return `${bestSellerMark ? "[BESTSELLER] " : ""}${item.name} (x${item.quantity})`;
+            }).join(", "),
             new Date(o.createdAt).toLocaleDateString(),
             `Rs. ${o.totalAmount.toLocaleString()}`,
             `- Rs. ${(o.totalAmount * 0.05).toFixed(2)}`,
@@ -417,7 +445,7 @@ export default function OperatorDashboard() {
                 5: { halign: 'right', fontStyle: 'bold', textColor: [21, 128, 61] }
             },
             alternateRowStyles: { fillColor: [249, 250, 251] },
-            margin: { left: 15, right: 15 }
+            margin: { left: 15, right: 15, top: 20, bottom: 40 }
         });
 
         // --- 5. FOOTER & PAGINATION ---
@@ -455,7 +483,7 @@ export default function OperatorDashboard() {
         <div className="dashboard-layout">
             {/* NAVBAR */}
             <nav className="dash-navbar">
-                <div className="dash-brand">🍕 FoodMenia</div>
+                <div className="dash-brand">🍕 <span>FoodMenia</span></div>
                 <div className="dash-nav-right">
                     <div className="dash-user-info">
                         <div className="dash-user-avatar">
@@ -494,6 +522,12 @@ export default function OperatorDashboard() {
                     >
                         💰 Profit
                     </button>
+                    <button
+                        className={`dash-tab ${activeTab === "collab" ? "active" : ""}`}
+                        onClick={() => setActiveTab("collab")}
+                    >
+                        🤝 Collab
+                    </button>
                 </div>
 
                 {/* MENU TAB */}
@@ -501,15 +535,36 @@ export default function OperatorDashboard() {
                     <div>
                         <div className="section-header">
                             <h2 className="section-title">Your Menu</h2>
-                            <button className="btn-primary" onClick={() => {
-                                if (showAddForm && editingItem) {
-                                    handleCancelEdit();
-                                } else {
-                                    setShowAddForm(!showAddForm);
-                                }
-                            }}>
-                                {showAddForm ? "✕ Cancel" : "＋ Add Item"}
-                            </button>
+                            <div className="flex align-center gap-4">
+                                <button
+                                    className="btn-secondary"
+                                    title="Recalculate Best Sellers (weekly)"
+                                    onClick={async () => {
+                                        try {
+                                            const res = await fetch(`${CONFIG.API_BASE}/menu/recalculate-best-sellers`, {
+                                                method: "POST",
+                                                headers: { Authorization: `Bearer ${token}` },
+                                            });
+                                            const data = await res.json();
+                                            showToast(data.success ? "success" : "info", data.message);
+                                            if (data.success) fetchMenu();
+                                        } catch {
+                                            showToast("error", "Failed to recalculate.");
+                                        }
+                                    }}
+                                >
+                                    🏆 Refresh Best Sellers
+                                </button>
+                                <button className="btn-primary" onClick={() => {
+                                    if (showAddForm && editingItem) {
+                                        handleCancelEdit();
+                                    } else {
+                                        setShowAddForm(!showAddForm);
+                                    }
+                                }}>
+                                    {showAddForm ? "✕ Cancel" : "＋ Add Item"}
+                                </button>
+                            </div>
                         </div>
 
                         {/* ADD/EDIT FORM */}
@@ -558,6 +613,18 @@ export default function OperatorDashboard() {
                                     </div>
 
                                     <div className="form-group">
+                                        <label>Food Type</label>
+                                        <select
+                                            value={formData.foodType}
+                                            onChange={(e) => setFormData({ ...formData, foodType: e.target.value })}
+                                        >
+                                            <option value="veg">🟢 Veg</option>
+                                            <option value="non-veg">🔴 Non-Veg</option>
+                                            <option value="both">🟡 Both</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="form-group">
                                         <label>Image</label>
                                         <div className="image-upload-area">
                                             {imagePreview ? (
@@ -572,7 +639,7 @@ export default function OperatorDashboard() {
                                                 type="file"
                                                 accept="image/*"
                                                 onChange={handleImageChange}
-                                                style={{ zIndex: 10, cursor: 'pointer' }}
+                                                className="upload-input-overlay"
                                             />
                                         </div>
                                     </div>
@@ -585,14 +652,16 @@ export default function OperatorDashboard() {
                                         />
                                     </div>
                                 </div>
-                                <button type="submit" className="btn-primary" disabled={loading}>
-                                    {loading ? (editingItem ? "Updating..." : "Adding...") : (editingItem ? "Update Item" : "Add Menu Item")}
-                                </button>
-                                {editingItem && (
-                                    <button type="button" className="btn-secondary" style={{ marginLeft: "10px" }} onClick={handleCancelEdit}>
-                                        Cancel Edit
+                                <div className="form-actions">
+                                    <button type="submit" className="btn-primary" disabled={loading}>
+                                        {loading ? (editingItem ? "Updating..." : "Adding...") : (editingItem ? "Update Item" : "Add Menu Item")}
                                     </button>
-                                )}
+                                    {editingItem && (
+                                        <button type="button" className="btn-secondary" onClick={handleCancelEdit}>
+                                            Cancel Edit
+                                        </button>
+                                    )}
+                                </div>
                             </form>
                         )}
 
@@ -609,6 +678,9 @@ export default function OperatorDashboard() {
                             <div className="menu-grid">
                                 {menuItems.map((item) => (
                                     <div className="menu-card" key={item._id}>
+                                        {item.isBestSeller && (
+                                            <div className="best-seller-badge">🔥 Best Seller</div>
+                                        )}
                                         {item.image ? (
                                             <img
                                                 src={`${CONFIG.UPLOADS_BASE}${item.image}`}
@@ -621,24 +693,25 @@ export default function OperatorDashboard() {
                                         <div className="menu-card-body">
                                             <div className="menu-card-name">{item.name}</div>
                                             <div
-                                                className="avg-rating"
+                                                className="avg-rating cursor-pointer"
                                                 onClick={() => setReviewPanel({ show: true, item: item })}
-                                                style={{ cursor: "pointer" }}
                                                 title="Manage Reviews"
                                             >
                                                 <span className="star">★</span> {item.averageRating || "0.0"}
-                                                <span style={{ fontSize: "0.8rem", opacity: 0.7 }}>({item.ratings?.length || 0})</span>
+                                                <span className="text-xs text-muted ml-8">({item.ratings?.length || 0})</span>
                                             </div>
                                             <div className="menu-card-desc">{item.description || "No description"}</div>
                                             <div className="menu-card-footer">
                                                 <div className="menu-card-price">₹{item.price}</div>
                                                 <div className="menu-card-category">{item.category}</div>
+                                                <div className="menu-card-ordered">
+                                                    📦 {item.orderCount || 0} ordered
+                                                </div>
                                             </div>
                                             <div className="menu-card-actions">
 
                                                 <button
-                                                    className="btn-icon"
-                                                    style={{ color: "#60a5fa", borderColor: "rgba(59, 130, 246, 0.3)" }}
+                                                    className="btn-icon info"
                                                     onClick={() => handleEditClick(item)}
                                                 >
                                                     ✏️ Edit
@@ -664,10 +737,10 @@ export default function OperatorDashboard() {
                         {/* Pending Orders */}
                         {pendingOrders.length > 0 && (
                             <>
-                                <h2 className="section-title" style={{ marginBottom: 16 }}>
+                                <h2 className="section-title mb-16">
                                     ⏳ Pending Orders ({pendingOrders.length})
                                 </h2>
-                                <div className="orders-list" style={{ marginBottom: 32 }}>
+                                <div className="orders-list mb-32">
                                     {pendingOrders.map((order) => (
                                         <div className="order-card" key={order._id}>
                                             <div className="order-header">
@@ -705,18 +778,18 @@ export default function OperatorDashboard() {
                                                 <div className="order-total">
                                                     <span>Total</span>₹{order.totalAmount}
                                                 </div>
-                                                <div className="order-actions">
+                                                <div className="order-actions gap-12">
                                                     <button
-                                                        className="btn-confirm"
+                                                        className="btn-primary btn-success flex-grow"
                                                         onClick={() => handleUpdateStatus(order._id, "confirmed")}
                                                     >
-                                                        ✅ Accept
+                                                        ✅ Accept Order
                                                     </button>
                                                     <button
-                                                        className="btn-reject"
+                                                        className="btn-secondary btn-danger"
                                                         onClick={() => setRejectionModal({ show: true, orderId: order._id })}
                                                     >
-                                                        ❌ Reject
+                                                        ✕ Reject
                                                     </button>
                                                 </div>
                                             </div>
@@ -729,12 +802,12 @@ export default function OperatorDashboard() {
                         {/* Cancellation Requests */}
                         {cancelRequestedOrders.length > 0 && (
                             <>
-                                <h2 className="section-title" style={{ marginBottom: 16, color: "#fca5a5" }}>
+                                <h2 className="section-title mb-16 text-danger-light">
                                     🚫 Cancellation Requests ({cancelRequestedOrders.length})
                                 </h2>
-                                <div className="orders-list" style={{ marginBottom: 32 }}>
+                                <div className="orders-list mb-32">
                                     {cancelRequestedOrders.map((order) => (
-                                        <div className="order-card" key={order._id} style={{ border: "1px solid rgba(239, 68, 68, 0.3)", background: "rgba(239, 68, 68, 0.05)" }}>
+                                        <div className="order-card order-card-cancel-req" key={order._id}>
                                             <div className="order-header">
                                                 <div>
                                                     <div className="order-id">#{order._id.slice(-8).toUpperCase()}</div>
@@ -745,7 +818,8 @@ export default function OperatorDashboard() {
                                                 </div>
                                                 <span className="order-status status-rejected">Requested</span>
                                             </div>
-                                            <div className="rejection-reason" style={{ margin: "0 16px 16px", color: "#fca5a5", fontSize: "0.9rem" }}>
+                                            <div className="rejection-reason rejection-reason-box">
+                                                <div className="text-sm font-700 mb-4">📞 {order.customerPhone}</div>
                                                 User Reason: {order.cancellationReason || "No reason provided"}
                                             </div>
                                             <div className="order-footer">
@@ -754,8 +828,7 @@ export default function OperatorDashboard() {
                                                 </div>
                                                 <div className="order-actions">
                                                     <button
-                                                        className="btn-reject"
-                                                        style={{ background: "#ef4444", color: "#fff", borderColor: "#ef4444" }}
+                                                        className="btn-reject bg-danger text-white border-danger"
                                                         onClick={() => handleUpdateStatus(order._id, "cancelled")}
                                                     >
                                                         Approve
@@ -777,10 +850,10 @@ export default function OperatorDashboard() {
                         {/* Active Orders */}
                         {activeOrders.length > 0 && (
                             <>
-                                <h2 className="section-title" style={{ marginBottom: 16 }}>
+                                <h2 className="section-title mb-16">
                                     🔥 Active Orders ({activeOrders.length})
                                 </h2>
-                                <div className="orders-list" style={{ marginBottom: 32 }}>
+                                <div className="orders-list mb-32">
                                     {activeOrders.map((order) => (
                                         <div className="order-card" key={order._id}>
                                             <div className="order-header">
@@ -808,9 +881,42 @@ export default function OperatorDashboard() {
                                                     </div>
                                                 ))}
                                             </div>
+
+                                            {/* Delivery Details & Instructions */}
+                                            <div className="order-contact-details bg-dark-subtle p-12 mt-8 rounded">
+                                                <div className="flex align-center gap-8 mb-4">
+                                                    <span className="text-secondary opacity-70">📞</span>
+                                                    <span className="font-700 text-sm"> {order.customerPhone || "N/A"}</span>
+                                                </div>
+                                                <div className="flex align-center gap-8 mb-8">
+                                                    <span className="text-secondary opacity-70">🏠</span>
+                                                    <span className="text-xs text-muted"> {order.customerAddress || "N/A"}</span>
+                                                </div>
+                                                {order.instructions && (
+                                                    <div className="order-instruction-box">
+                                                        <span className="instruction-label text-orange">Special Instructions:</span>
+                                                        <p className="instruction-text text-xs italic text-muted mt-4">"{order.instructions}"</p>
+                                                    </div>
+                                                )}
+                                            </div>
                                             <div className="order-footer">
-                                                <div className="order-total">
-                                                    <span>Total</span>₹{order.totalAmount}
+                                                <div className="order-total-container">
+                                                    <div className="order-total">
+                                                        <span>Total</span>
+                                                        {order.studentDiscountApplied ? (
+                                                            <div className="flex align-center gap-8">
+                                                                <s style={{ opacity: 0.4, fontSize: 13 }}>₹{order.totalAmount + (order.discountAmount || 0)}</s>
+                                                                <span>₹{order.totalAmount}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span>₹{order.totalAmount}</span>
+                                                        )}
+                                                    </div>
+                                                    {order.studentDiscountApplied && (
+                                                        <div className="order-student-badge">
+                                                            🎓 20% Student Off
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {/* Payment badge */}
@@ -820,27 +926,19 @@ export default function OperatorDashboard() {
 
                                                 {/* OTP input for out_for_delivery */}
                                                 {order.status === "out_for_delivery" ? (
-                                                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                                                    <div className="flex align-center gap-8 flex-wrap mt-8">
                                                         <input
                                                             type="text"
                                                             maxLength={4}
-                                                            placeholder="Enter OTP from customer"
+                                                            placeholder="Enter OTP"
                                                             value={otpInput[order._id] || ""}
                                                             onChange={e => setOtpInput(prev => ({ ...prev, [order._id]: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
                                                             className="otp-input-field"
-                                                            style={{
-                                                                width: 140, padding: "9px 12px", borderRadius: 10,
-                                                                background: "rgba(255,255,255,0.05)",
-                                                                border: "1px solid rgba(255,255,255,0.1)",
-                                                                color: "#fff", fontSize: 14, letterSpacing: 3, fontWeight: 700,
-                                                                textAlign: "center"
-                                                            }}
                                                         />
                                                         <button
                                                             className="btn-confirm"
                                                             onClick={() => handleVerifyOtp(order._id)}
                                                             disabled={loading}
-                                                            style={{ padding: "9px 18px" }}
                                                         >
                                                             📦 Verify & Deliver
                                                         </button>
@@ -863,12 +961,12 @@ export default function OperatorDashboard() {
                         {/* Completed Orders */}
                         {completedOrders.length > 0 && (
                             <>
-                                <h2 className="section-title" style={{ marginBottom: 16 }}>
+                                <h2 className="section-title mb-16">
                                     ✅ Completed / Rejected ({completedOrders.length})
                                 </h2>
                                 <div className="orders-list">
                                     {completedOrders.slice(0, 20).map((order) => (
-                                        <div className="order-card" key={order._id} style={{ opacity: 0.7 }}>
+                                        <div className="order-card opacity-70" key={order._id}>
                                             <div className="order-header">
                                                 <div>
                                                     <div className="order-id">#{order._id.slice(-8).toUpperCase()}</div>
@@ -882,8 +980,23 @@ export default function OperatorDashboard() {
                                                 </span>
                                             </div>
                                             <div className="order-footer">
-                                                <div className="order-total">
-                                                    <span>Total</span>₹{order.totalAmount}
+                                                <div className="order-total-container">
+                                                    <div className="order-total">
+                                                        <span>Total</span>
+                                                        {order.studentDiscountApplied ? (
+                                                            <div className="flex align-center gap-8">
+                                                                <s style={{ opacity: 0.4, fontSize: 13 }}>₹{order.totalAmount + (order.discountAmount || 0)}</s>
+                                                                <span>₹{order.totalAmount}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span>₹{order.totalAmount}</span>
+                                                        )}
+                                                    </div>
+                                                    {order.studentDiscountApplied && (
+                                                        <div className="order-student-badge">
+                                                            🎓 20% Student Off
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                             {order.status === "rejected" && order.rejectionReason && (
@@ -973,16 +1086,17 @@ export default function OperatorDashboard() {
                             });
 
                             const grossRevenue = filteredDelivered.reduce((sum, o) => sum + o.totalAmount, 0);
+                            const totalStudentDiscounts = filteredDelivered.reduce((sum, o) => sum + (o.discountAmount || 0), 0);
                             const platformFee = grossRevenue * 0.05;
                             const netProfit = grossRevenue - platformFee;
 
                             return (
                                 <>
-                                    <div className="profit-actions" style={{ marginBottom: 20, display: 'flex', justifyContent: 'flex-end' }}>
+                                    <div className="profit-actions flex-end mb-24">
                                         <button
                                             className="btn-download-pdf"
                                             onClick={() => handleDownloadInvoice(filteredDelivered, {
-                                                grossRevenue, platformFee, netProfit, timeframe: profitTimeframe
+                                                grossRevenue, platformFee, netProfit, totalStudentDiscounts, timeframe: profitTimeframe
                                             })}
                                             disabled={filteredDelivered.length === 0}
                                         >
@@ -990,24 +1104,29 @@ export default function OperatorDashboard() {
                                         </button>
                                     </div>
                                     <div className="profit-summary-grid">
-                                        <div className="profit-card total">
-                                            <div className="profit-card-label">Gross Revenue</div>
-                                            <div className="profit-card-val">₹{grossRevenue.toLocaleString()}</div>
-                                            <div className="profit-card-sub">{filteredDelivered.length} Orders</div>
+                                        <div className="profit-card">
+                                            <div className="profit-label">Gross Revenue</div>
+                                            <div className="profit-value">₹{grossRevenue.toLocaleString()}</div>
+                                            <div className="text-xs text-muted mt-8">{filteredDelivered.length} Orders</div>
                                         </div>
-                                        <div className="profit-card fees">
-                                            <div className="profit-card-label">Platform Fees (5%)</div>
-                                            <div className="profit-card-val">₹{platformFee.toLocaleString()}</div>
-                                            <div className="profit-card-sub">Deducted automatically</div>
+                                        <div className="profit-card">
+                                            <div className="profit-label">Student Discounts</div>
+                                            <div className="profit-value text-orange">₹{totalStudentDiscounts.toLocaleString()}</div>
+                                            <div className="text-xs text-muted mt-8">Impact on total revenue</div>
                                         </div>
-                                        <div className="profit-card net">
-                                            <div className="profit-card-label">Net Profit</div>
-                                            <div className="profit-card-val">₹{netProfit.toLocaleString()}</div>
-                                            <div className="profit-card-sub">Your actual earnings</div>
+                                        <div className="profit-card">
+                                            <div className="profit-label">Platform Fees (5%)</div>
+                                            <div className="profit-value text-danger-light">- ₹{platformFee.toLocaleString()}</div>
+                                            <div className="text-xs text-muted mt-8">Based on discounted total</div>
+                                        </div>
+                                        <div className="profit-card">
+                                            <div className="profit-label">Net Profit</div>
+                                            <div className="profit-value text-green-light">₹{netProfit.toLocaleString()}</div>
+                                            <div className="text-xs text-muted mt-8">Final partnership payout</div>
                                         </div>
                                     </div>
 
-                                    <h3 className="section-title" style={{ marginTop: 40, marginBottom: 20 }}>Order History ({profitTimeframe.replace("_", " ")})</h3>
+                                    <h3 className="section-title mt-40 mb-24">Order History ({profitTimeframe.replace("_", " ")})</h3>
                                     {filteredDelivered.length === 0 ? (
                                         <div className="empty-state">
                                             <div className="empty-icon">💸</div>
@@ -1024,9 +1143,25 @@ export default function OperatorDashboard() {
                                                             <div className="order-customer">{order.userName}</div>
                                                             <div className="order-time">{new Date(order.createdAt).toLocaleString()}</div>
                                                         </div>
-                                                        <div style={{ textAlign: "right" }}>
-                                                            <div className="order-total" style={{ margin: 0 }}>₹{order.totalAmount}</div>
-                                                            <div style={{ fontSize: "0.8rem", color: "rgba(255,121,198,0.6)" }}>Fee: ₹{(order.totalAmount * 0.05).toFixed(2)}</div>
+                                                        <div className="text-right">
+                                                            <div className="flex-col align-end gap-2">
+                                                                <div className="order-total m-0">
+                                                                    {order.studentDiscountApplied ? (
+                                                                        <div className="flex align-center gap-8 justify-end">
+                                                                            <s style={{ opacity: 0.4, fontSize: 12 }}>₹{order.totalAmount + (order.discountAmount || 0)}</s>
+                                                                            <span>₹{order.totalAmount}</span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span>₹{order.totalAmount}</span>
+                                                                    )}
+                                                                </div>
+                                                                {order.studentDiscountApplied && (
+                                                                    <div className="order-student-badge" style={{ fontSize: '9px', padding: '1px 6px' }}>
+                                                                        🎓 STUDENT OFFER
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="fee-text mt-4">Fee: ₹{(order.totalAmount * 0.05).toFixed(2)}</div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1038,94 +1173,123 @@ export default function OperatorDashboard() {
                         })()}
                     </div>
                 )}
+                {/* CREATOR COLLABORATION TAB */}
+                {activeTab === "collab" && (
+                    <OperatorCreatorChat
+                        token={token}
+                        user={user}
+                        showToast={showToast}
+                    />
+                )}
             </div>
 
             {/* REJECTION MODAL */}
-            {rejectionModal.show && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-title">❌ Reject Order</div>
-                        <div className="modal-body">
-                            <p>Are you sure you want to reject this order? You can provide a reason below:</p>
-                            <textarea
-                                className="textarea-input"
-                                placeholder="e.g. Out of stock, closing soon..."
-                                value={rejectionReason}
-                                onChange={(e) => setRejectionReason(e.target.value)}
-                            />
-                        </div>
-                        <div className="modal-actions">
-                            <button className="btn-icon" onClick={() => { setRejectionModal({ show: false, orderId: null }); setRejectionReason(""); }}>Cancel</button>
-                            <button className="btn-primary" onClick={() => {
-                                handleUpdateStatus(rejectionModal.orderId, "rejected", rejectionReason);
-                                setRejectionModal({ show: false, orderId: null });
-                                setRejectionReason("");
-                            }}>Confirm Rejection</button>
+            {
+                rejectionModal.show && (
+                    <div className="modal-overlay">
+                        <div className="modal-content">
+                            <div className="modal-title">🚫 Reject Order</div>
+                            <div className="modal-body">
+                                <p className="mb-12 text-secondary">Please provide a reason for rejecting this order:</p>
+                                <textarea
+                                    className="textarea-input"
+                                    placeholder="Out of stock / Restaurant closed..."
+                                    value={rejectionReason}
+                                    onChange={(e) => setRejectionReason(e.target.value)}
+                                />
+                            </div>
+                            <div className="modal-actions gap-12">
+                                <button className="btn-secondary" onClick={() => setRejectionModal({ show: false, orderId: null })}>Cancel</button>
+                                <button
+                                    className="btn-primary btn-danger flex-grow"
+                                    onClick={async () => {
+                                        if (!rejectionReason.trim()) {
+                                            showToast("error", "Please enter a reason");
+                                            return;
+                                        }
+                                        handleUpdateStatus(rejectionModal.orderId, "rejected");
+                                        setRejectionModal({ show: false, orderId: null });
+                                        setRejectionReason("");
+                                    }}
+                                >
+                                    Confirm Rejection
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* TOAST */}
             {/* REVIEW MANAGEMENT PANEL */}
             {reviewPanel.show && (
                 <div className="modal-overlay" onClick={() => setReviewPanel({ show: false, item: null })}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "500px" }}>
-                        <div className="modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                            <div className="modal-title" style={{ margin: 0 }}>💬 Reviews for {reviewPanel.item.name}</div>
-                            <button className="close-btn" onClick={() => setReviewPanel({ show: false, item: null })} style={{ background: "none", border: "none", color: "#fff", fontSize: "1.2rem", cursor: "pointer" }}>✕</button>
+                    <div className="modal-content max-w-550" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header flex-between mb-24">
+                            <div className="modal-title m-0">💬 Reviews for {reviewPanel.item.name}</div>
+                            <button className="close-btn" onClick={() => setReviewPanel({ show: false, item: null })}>✕</button>
                         </div>
-                        <div className="modal-body" style={{ maxHeight: "65vh", overflowY: "auto" }}>
-                            <div className="reviews-list" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                        <div className="modal-body">
+                            <div className="reviews-list-container">
                                 {reviewPanel.item.ratings?.length > 0 ? (
                                     reviewPanel.item.ratings.map((r, i) => (
-                                        <div key={i} className="review-item" style={{ padding: "16px", background: "rgba(255,255,255,0.03)", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.05)" }}>
-                                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                                                <div style={{ fontWeight: 700, color: "#60a5fa" }}>{r.userName}</div>
-                                                <div style={{ color: "#ff512f" }}>{"★".repeat(r.rating)}</div>
+                                        <div key={i} className="review-item-card mb-16">
+                                            <div className="flex-between mb-8">
+                                                <div className="review-user-name">{r.userName}</div>
+                                                <div className="text-amber">{"★".repeat(r.rating)}</div>
                                             </div>
-                                            <div style={{ fontSize: "0.9rem", color: "#ddd", marginBottom: "12px" }}>{r.comment || "No comment."}</div>
+                                            <div className="review-text">{r.comment || "No comment."}</div>
 
-                                            <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "12px" }}>
+                                            <div className="flex align-center gap-12 mb-12">
                                                 <button
                                                     onClick={() => handleLikeRating(reviewPanel.item._id, r._id)}
-                                                    style={{ background: "none", border: "none", color: r.likes?.includes(user.id) ? "#ff512f" : "#fff", cursor: "pointer", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "4px" }}
+                                                    className={`review-like-btn ${r.likes?.includes(user.id) ? "liked" : ""}`}
                                                 >
                                                     {r.likes?.includes(user.id) ? "❤️" : "🤍"} {r.likes?.length || 0}
                                                 </button>
-                                                <div style={{ fontSize: "0.7rem", opacity: 0.4 }}>{new Date(r.createdAt).toLocaleDateString()}</div>
+                                                <div className="text-xs text-muted">{new Date(r.createdAt).toLocaleDateString()}</div>
                                             </div>
 
                                             {/* Replies List */}
                                             {r.replies?.length > 0 && (
-                                                <div style={{ marginLeft: "15px", paddingLeft: "15px", borderLeft: "2px solid rgba(255,255,255,0.1)", display: "flex", flexDirection: "column", gap: "8px", marginTop: "10px" }}>
+                                                <div className="ml-12 pl-12 border-left-glass flex-col gap-2 mt-12 mb-12">
                                                     {r.replies.map((reply, ri) => (
-                                                        <div key={ri} style={{ background: "rgba(255,255,255,0.02)", padding: "8px 12px", borderRadius: "8px" }}>
-                                                            <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#9ae6b4" }}>{reply.userName}</div>
-                                                            <div style={{ fontSize: "0.8rem", opacity: 0.9 }}>{reply.text}</div>
+                                                        <div key={ri} className="glass-panel p-8">
+                                                            <div className="text-xs font-bold text-success">{reply.userName}</div>
+                                                            <div className="text-sm text-secondary">{reply.text}</div>
                                                         </div>
                                                     ))}
                                                 </div>
                                             )}
 
                                             {/* Reply Input */}
-                                            <div style={{ marginTop: "12px", display: "flex", gap: "8px" }}>
+                                            <div className="review-reply-area mt-12">
                                                 <input
                                                     type="text"
                                                     placeholder="Reply to customer..."
-                                                    style={{ flex: 1, padding: "8px 12px", borderRadius: "8px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", fontSize: "0.8rem" }}
+                                                    className="review-reply-input"
                                                     onKeyDown={(e) => {
-                                                        if (e.key === "Enter") {
+                                                        if (e.key === "Enter" && e.target.value.trim()) {
                                                             handleReplyRating(reviewPanel.item._id, r._id, e.target.value);
                                                             e.target.value = "";
                                                         }
                                                     }}
                                                 />
+                                                <button
+                                                    className="review-post-btn"
+                                                    onClick={(e) => {
+                                                        const input = e.currentTarget.previousSibling;
+                                                        if (input.value.trim()) {
+                                                            handleReplyRating(reviewPanel.item._id, r._id, input.value);
+                                                            input.value = "";
+                                                        }
+                                                    }}
+                                                >
+                                                    Post
+                                                </button>
                                             </div>
                                         </div>
                                     ))
                                 ) : (
-                                    <div style={{ textAlign: "center", padding: "40px", opacity: 0.4 }}>No reviews yet.</div>
+                                    <div className="text-center p-24 text-muted">No reviews yet.</div>
                                 )}
                             </div>
                         </div>

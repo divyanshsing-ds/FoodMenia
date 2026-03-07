@@ -40,7 +40,18 @@ export default function UserDashboard() {
     const [reviewPanel, setReviewPanel] = useState({ show: false, item: null });
     const [paymentMethod, setPaymentMethod] = useState("cod"); // "cod" | "upi"
     const [upiModal, setUpiModal] = useState({ show: false, orderId: null, amount: 0 });
-    const [pendingCheckoutData, setPendingCheckoutData] = useState(null); // grouped cart data waiting for UPI
+    const [pendingCheckoutData, setPendingCheckoutData] = useState(null);
+    const [foodTypeFilter, setFoodTypeFilter] = useState("all"); // "all" | "veg" | "non-veg"
+    const [studentVerified, setStudentVerified] = useState(false); // true if verified & not expired
+    const [studentInfo, setStudentInfo] = useState(null);        // { institutionName, idExpiryDate }
+    const [applyStudentDiscount, setApplyStudentDiscount] = useState(false);
+    const [studentModal, setStudentModal] = useState(false);     // show ID upload modal
+    const [studentForm, setStudentForm] = useState({ institutionName: "", idExpiryDate: "", file: null });
+    const [studentLoading, setStudentLoading] = useState(false);
+    const [phone, setPhone] = useState("");
+    const [address, setAddress] = useState("");
+    const [instructions, setInstructions] = useState("");
+    const [isEditingAddress, setIsEditingAddress] = useState(false);
     const orderStatusRef = useRef({});
 
     const user = JSON.parse(localStorage.getItem(CONFIG.dataKey("user")) || "{}");
@@ -64,8 +75,10 @@ export default function UserDashboard() {
             const res = await fetch(`${CONFIG.API_BASE}/video/feed`);
             const data = await res.json();
             if (data.success) {
-                setReels(data.data);
-                setDisplayReels([...data.data, ...data.data, ...data.data]);
+                // Shuffle client-side too for extra randomness
+                const shuffled = [...data.data].sort(() => Math.random() - 0.5);
+                setReels(shuffled);
+                setDisplayReels([...shuffled, ...shuffled, ...shuffled]);
             }
         } catch {
             showToast("error", "Failed to load reels");
@@ -112,6 +125,35 @@ export default function UserDashboard() {
         } catch {
             showToast("error", "Failed to like reel");
         }
+    };
+
+    const handleFollow = async (creatorId) => {
+        try {
+            const res = await fetch(`${CONFIG.API_BASE}/creator/${creatorId}/follow`, {
+                method: "POST",
+                headers: authHeaders()
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast("success", data.message);
+                const updatedUser = {
+                    ...user, following: data.isFollowing
+                        ? [...(user.following || []), creatorId]
+                        : (user.following || []).filter(id => id !== creatorId)
+                };
+                localStorage.setItem(CONFIG.dataKey("user"), JSON.stringify(updatedUser));
+                setDisplayReels(prev => [...prev]);
+            } else {
+                showToast("error", data.message);
+            }
+        } catch {
+            showToast("error", "Failed to follow creator");
+        }
+    };
+
+    const openCreatorProfile = (creatorId) => {
+        if (!creatorId) return;
+        navigate(`/creator-profile/${creatorId}`);
     };
 
     const handleComment = async (e) => {
@@ -219,15 +261,24 @@ export default function UserDashboard() {
         }
     };
 
-    const fetchMenu = useCallback(async () => {
+    const fetchMenu = useCallback(async (isSilent = false) => {
         try {
             const res = await fetch(`${CONFIG.API_BASE}/menu`);
             const data = await res.json();
-            if (data.success) setMenuItems(data.data);
+            if (data.success) {
+                setMenuItems(data.data);
+                // Also update the review panel item if it's currently open
+                if (reviewPanel?.show && reviewPanel?.item) {
+                    const updatedItem = data.data.find(i => i._id === reviewPanel.item._id);
+                    if (updatedItem) {
+                        setReviewPanel(prev => ({ ...prev, item: updatedItem }));
+                    }
+                }
+            }
         } catch {
-            showToast("error", "Failed to load menu");
+            if (!isSilent) showToast("error", "Failed to load menu");
         }
-    }, []);
+    }, [reviewPanel?.show, reviewPanel?.item]);
 
     const fetchOrders = useCallback(async (isSilent = false) => {
         try {
@@ -270,22 +321,112 @@ export default function UserDashboard() {
         }
     }, [activeTab, fetchOrders, token]);
 
-    // 3. Local role protection
+    // 3. Body scroll lock when cart or major modals are open
+    useEffect(() => {
+        if (showCart || studentModal || ratingModal.show || upiModal.show) {
+            document.body.style.overflow = "hidden";
+        } else {
+            document.body.style.overflow = "unset";
+        }
+        return () => { document.body.style.overflow = "unset"; };
+    }, [showCart, studentModal, ratingModal.show, upiModal.show]);
+
+    // 4. Local role protection
     useEffect(() => {
         if (!token || user.role !== "user") {
             navigate("/");
         }
     }, [token, user.role, navigate]);
 
+    const fetchUserProfile = useCallback(async () => {
+        if (!token) return;
+        try {
+            const res = await fetch(`${CONFIG.API_BASE}/auth/me`, { headers: authHeaders() });
+            const data = await res.json();
+            if (data.success) {
+                if (data.data.phone) setPhone(data.data.phone);
+                if (data.data.address) setAddress(data.data.address);
+            }
+        } catch { /* silent */ }
+    }, [token, authHeaders]);
+
     useEffect(() => {
         fetchMenu();
         fetchReels();
         fetchOrders();
-        const interval = setInterval(() => fetchOrders(true), 15000);
+        fetchStudentStatus();
+        fetchUserProfile();
+        const interval = setInterval(() => {
+            fetchOrders(true);
+            fetchMenu(true);
+        }, 5000);
         return () => clearInterval(interval);
-    }, [fetchMenu, fetchReels, fetchOrders]);
+    }, [fetchMenu, fetchReels, fetchOrders, fetchUserProfile]);
 
-    // Group menu items by restaurant
+    const fetchStudentStatus = async () => {
+        if (!token) return;
+        try {
+            const res = await fetch(`${CONFIG.API_BASE}/student/status`, { headers: authHeaders() });
+            const data = await res.json();
+            if (data.success && data.studentStatus === "verified") {
+                const expiry = new Date(data.idExpiryDate);
+                if (expiry > new Date()) {
+                    setStudentVerified(true);
+                    setStudentInfo({ institutionName: data.institutionName, idExpiryDate: expiry });
+                } else {
+                    setStudentVerified(false);
+                    setStudentInfo(null);
+                }
+            } else {
+                setStudentVerified(false);
+                setStudentInfo(null);
+            }
+        } catch { /* silent */ }
+    };
+
+    const handleStudentVerify = async (e) => {
+        e.preventDefault();
+        if (!studentForm.file) { showToast("error", "Please select your student ID image"); return; }
+        if (!studentForm.institutionName) { showToast("error", "Please enter your institution name"); return; }
+        if (!studentForm.idExpiryDate) { showToast("error", "Please enter the ID expiry date"); return; }
+        setStudentLoading(true);
+        try {
+            const fd = new FormData();
+            fd.append("studentId", studentForm.file);
+            fd.append("institutionName", studentForm.institutionName);
+            fd.append("idExpiryDate", studentForm.idExpiryDate);
+            const res = await fetch(`${CONFIG.API_BASE}/student/verify`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+                body: fd,
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast("success", data.message);
+                setStudentModal(false);
+                setStudentForm({ institutionName: "", idExpiryDate: "", file: null });
+                await fetchStudentStatus();
+            } else {
+                showToast("error", data.message);
+            }
+        } catch {
+            showToast("error", "Verification failed. Please try again.");
+        } finally {
+            setStudentLoading(false);
+        }
+    };
+
+    const handleRevokeStudent = async () => {
+        if (!window.confirm("Remove your student verification?")) return;
+        try {
+            await fetch(`${CONFIG.API_BASE}/student/revoke`, { method: "DELETE", headers: authHeaders() });
+            setStudentVerified(false);
+            setStudentInfo(null);
+            setApplyStudentDiscount(false);
+            showToast("info", "Student verification removed.");
+        } catch { showToast("error", "Failed to revoke."); }
+    };
+
     const groupedMenu = menuItems.reduce((acc, item) => {
         const key = `${item.operatorId}__${item.restaurantName}`;
         if (!acc[key]) {
@@ -301,8 +442,21 @@ export default function UserDashboard() {
 
     const restaurantGroups = Object.values(groupedMenu);
 
-    // Filter restaurants or menu items
+    // Filter restaurants based on search and food type
     const filteredRestaurants = restaurantGroups.filter((group) => {
+        // First filter by food type if not "all"
+        if (foodTypeFilter !== "all") {
+            if (foodTypeFilter === "veg") {
+                // Strict: Hide if restaurant has ANY non-veg items
+                const isPureVeg = !group.items.some(item => item.foodType === "non-veg");
+                if (!isPureVeg) return false;
+            } else if (foodTypeFilter === "non-veg") {
+                // Standard: Show restaurants that actually serve non-veg
+                const hasNonVeg = group.items.some(item => item.foodType === "non-veg");
+                if (!hasNonVeg) return false;
+            }
+        }
+
         if (!searchQuery) return true;
         const q = searchQuery.toLowerCase();
         return (
@@ -317,6 +471,11 @@ export default function UserDashboard() {
 
     const filteredMenu = selectedRestaurant
         ? selectedRestaurant.items.filter((item) => {
+            // Filter by food type
+            if (foodTypeFilter !== "all") {
+                if (item.foodType !== foodTypeFilter && item.foodType !== "both") return false;
+            }
+
             if (!searchQuery) return true;
             const q = searchQuery.toLowerCase();
             return (
@@ -359,18 +518,26 @@ export default function UserDashboard() {
         }
         setQuantities({ ...quantities, [item._id]: 1 });
         setCartNutrition(null);
+        setInstructions(""); // Clear instructions for new item context
         showToast("success", `${item.name} added to cart!`);
     };
 
     const removeFromCart = (menuItemId) => {
-        setCart(cart.filter((c) => c.menuItemId !== menuItemId));
+        const newCart = cart.filter((c) => c.menuItemId !== menuItemId);
+        setCart(newCart);
         setCartNutrition(null);
+        if (newCart.length === 0) setInstructions(""); // Clear if cart is now empty
     };
 
     const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const discountAmount = applyStudentDiscount && studentVerified ? Math.round(cartTotal * 0.20) : 0;
+    const discountedTotal = cartTotal - discountAmount;
 
     const handleCheckout = async () => {
         if (cart.length === 0) return;
+        if (!phone.trim()) { showToast("error", "Please enter your phone number."); return; }
+        if (!address.trim()) { showToast("error", "Please enter your delivery address."); return; }
+
         setLoading(true);
         try {
             const grouped = cart.reduce((acc, item) => {
@@ -391,7 +558,7 @@ export default function UserDashboard() {
             // --- UPI: show payment modal before creating orders ---
             if (paymentMethod === "upi") {
                 setPendingCheckoutData(grouped);
-                setUpiModal({ show: true, orderId: null, amount: cartTotal });
+                setUpiModal({ show: true, orderId: null, amount: discountedTotal });
                 setLoading(false);
                 return;
             }
@@ -401,6 +568,7 @@ export default function UserDashboard() {
             if (orderIds) {
                 showToast("success", "Order placed successfully! 🎉");
                 setCart([]);
+                setInstructions(""); // Reset instructions after order
                 setShowCart(false);
                 setActiveTab("orders");
                 fetchOrders();
@@ -424,6 +592,10 @@ export default function UserDashboard() {
                     restaurantName: group.restaurantName,
                     items: group.items,
                     paymentMethod: method,
+                    applyStudentDiscount: applyStudentDiscount && studentVerified,
+                    phone: phone.trim(),
+                    address: address.trim(),
+                    instructions: instructions.trim(),
                 }),
             });
             const data = await res.json();
@@ -454,6 +626,7 @@ export default function UserDashboard() {
 
             showToast("success", "UPI Payment confirmed! Order placed 🎉");
             setCart([]);
+            setInstructions(""); // Reset instructions after order
             setShowCart(false);
             setUpiModal({ show: false, orderId: null, amount: 0 });
             setPendingCheckoutData(null);
@@ -466,6 +639,28 @@ export default function UserDashboard() {
         }
     };
 
+    const openRatingModal = (item, orderId) => {
+        const menuItem = menuItems.find(m => m._id === item.menuItemId);
+        // Find existing rating specifically for THIS order
+        const existingRating = menuItem?.ratings?.find(r =>
+            r.userId === user.id && r.orderId === orderId
+        );
+
+        if (existingRating) {
+            setUserRating(existingRating.rating);
+            setUserComment(existingRating.comment || "");
+        } else {
+            setUserRating(5);
+            setUserComment("");
+        }
+
+        setRatingModal({
+            show: true,
+            item: { ...item, restaurantName: menuItem?.restaurantName || item.restaurantName },
+            orderId
+        });
+    };
+
     const handleRate = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -473,20 +668,33 @@ export default function UserDashboard() {
             const res = await fetch(`${CONFIG.API_BASE}/menu/${ratingModal.item.menuItemId}/rate`, {
                 method: "POST",
                 headers: authHeaders(),
-                body: JSON.stringify({ rating: userRating, comment: userComment }),
+                body: JSON.stringify({
+                    rating: userRating,
+                    comment: userComment,
+                    orderId: ratingModal.orderId
+                }),
             });
             const data = await res.json();
             if (data.success) {
                 showToast("success", "Thanks for your rating! ⭐");
-                setRatingModal({ show: false, item: null });
+                setRatingModal({ show: false, item: null, orderId: null });
                 setUserRating(5);
                 setUserComment("");
-                fetchMenu();
+                // Immediate state sync for local UI
+                if (data.data) {
+                    setMenuItems(prev => prev.map(item => item._id === data.data._id ? data.data : item));
+                    if (reviewPanel?.item?._id === data.data._id) {
+                        setReviewPanel(prev => ({ ...prev, item: data.data }));
+                    }
+                }
+                fetchMenu(); // Final refresh
             } else {
-                showToast("error", data.message);
+                console.warn("Rating Error:", data.message);
+                showToast("error", data.message || "Failed to submit rating");
             }
-        } catch {
-            showToast("error", "Failed to submit rating");
+        } catch (err) {
+            console.error("Rating Submission Error:", err);
+            showToast("error", "Failed to submit rating. Check console.");
         } finally {
             setLoading(false);
         }
@@ -509,6 +717,7 @@ export default function UserDashboard() {
     };
 
     const handleLogout = () => {
+        setLoading(false);
         localStorage.removeItem(CONFIG.tokenKey("user"));
         localStorage.removeItem(CONFIG.dataKey("user"));
         navigate("/");
@@ -584,7 +793,7 @@ export default function UserDashboard() {
         <div className="dashboard-layout">
             {/* NAVBAR */}
             <nav className="dash-navbar">
-                <div className="dash-brand">🍕 FoodMenia</div>
+                <div className="dash-brand">🍕 <span>FoodMenia</span></div>
                 <div className="dash-nav-right">
                     <div className="dash-user-info">
                         <div className="dash-user-avatar">{user.fullName?.charAt(0)?.toUpperCase() || "U"}</div>
@@ -600,7 +809,7 @@ export default function UserDashboard() {
             </nav>
 
             {/* CONTENT */}
-            <div className="dash-content">
+            <div className={`dash-content ${activeTab === 'reels' ? 'reels-tab-active' : ''}`}>
                 <div className="dash-tabs">
                     <button
                         className={`dash-tab ${activeTab === "browse" ? "active" : ""}`}
@@ -631,14 +840,36 @@ export default function UserDashboard() {
                             </h2>
                         </div>
 
-                        <div className="search-bar">
-                            <input
-                                className="search-input"
-                                type="text"
-                                placeholder="Search restaurants or dishes..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
+                        <div className="search-filter-row">
+                            <div className="search-bar">
+                                <input
+                                    className="search-input"
+                                    type="text"
+                                    placeholder="Search restaurants or dishes..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                            <div className="food-type-filter">
+                                <button
+                                    className={`filter-btn ${foodTypeFilter === "all" ? "active" : ""}`}
+                                    onClick={() => setFoodTypeFilter("all")}
+                                >
+                                    Both
+                                </button>
+                                <button
+                                    className={`filter-btn veg ${foodTypeFilter === "veg" ? "active" : ""}`}
+                                    onClick={() => setFoodTypeFilter("veg")}
+                                >
+                                    🟢 Veg
+                                </button>
+                                <button
+                                    className={`filter-btn non-veg ${foodTypeFilter === "non-veg" ? "active" : ""}`}
+                                    onClick={() => setFoodTypeFilter("non-veg")}
+                                >
+                                    🔴 Non-Veg
+                                </button>
+                            </div>
                         </div>
 
                         {!selectedRestaurant ? (
@@ -670,6 +901,10 @@ export default function UserDashboard() {
                                             />
                                             <div className="restaurant-banner-overlay">
                                                 <h3 className="restaurant-banner-name">{group.restaurantName}</h3>
+                                                <div className="restaurant-banner-tags">
+                                                    {group.items.some(i => i.foodType === 'veg' || i.foodType === 'both') && <span className="tag-veg">Veg</span>}
+                                                    {group.items.some(i => i.foodType === 'non-veg' || i.foodType === 'both') && <span className="tag-non-veg">Non-Veg</span>}
+                                                </div>
                                                 <div className="restaurant-banner-info">
                                                     {group.items.length} items available
                                                 </div>
@@ -700,6 +935,9 @@ export default function UserDashboard() {
                                     ) : (
                                         filteredMenu.map((item) => (
                                             <div className="food-card" key={item._id}>
+                                                {item.isBestSeller && (
+                                                    <div className="best-seller-badge">🔥 Best Seller</div>
+                                                )}
                                                 {item.image ? (
                                                     <img
                                                         src={`${CONFIG.UPLOADS_BASE}${item.image}`}
@@ -710,15 +948,15 @@ export default function UserDashboard() {
                                                     <div className="food-card-placeholder">🍔</div>
                                                 )}
                                                 <div className="food-card-body">
-                                                    <div className="food-card-name">{item.name}</div>
-                                                    <div
-                                                        className="avg-rating"
+                                                    <div className="food-card-header">
+                                                        <div className={`food-dot ${item.foodType}`}></div>
+                                                        <div className="food-card-name">{item.name}</div>
+                                                    </div>
+                                                    <div className="avg-rating cursor-pointer"
                                                         onClick={() => setReviewPanel({ show: true, item: item })}
-                                                        style={{ cursor: "pointer" }}
-                                                        title="View Reviews"
-                                                    >
+                                                        title="View Reviews">
                                                         <span className="star">★</span> {item.averageRating || "0.0"}
-                                                        <span style={{ fontSize: "0.8rem", opacity: 0.7 }}>({item.ratings?.length || 0})</span>
+                                                        <span className="text-xs opacity-70">({item.ratings?.length || 0})</span>
                                                     </div>
                                                     <div className="food-card-desc">{item.description || "Delicious dish"}</div>
                                                     <div className="food-card-bottom">
@@ -748,14 +986,14 @@ export default function UserDashboard() {
 
                 {/* REELS TAB */}
                 {activeTab === "reels" && (
-                    <div className="reels-container">
+                    <div className="reels-container" tabIndex="0">
                         {displayReels.length > 0 ? (
                             <div className="reels-feed">
                                 {displayReels.map((reel, idx) => (
                                     <div className="reel-card" key={`${reel._id}-${idx}`}>
                                         <video
                                             key={reel._id}
-                                            src={reel.videoUrl.startsWith("http") ? reel.videoUrl : `${CONFIG.UPLOADS_BASE}${reel.videoUrl}`}
+                                            src={reel.videoUrl.startsWith("http") ? reel.videoUrl : `${CONFIG.UPLOADS_BASE}${reel.videoUrl.startsWith("/") ? "" : "/"}${reel.videoUrl}`}
                                             className="reel-video"
                                             autoPlay
                                             loop
@@ -768,9 +1006,45 @@ export default function UserDashboard() {
                                         />
                                         <div className="reel-overlay">
                                             <div className="reel-info">
-                                                <div className="reel-creator">@{reel.creatorId?.fullName.replace(" ", "").toLowerCase()}</div>
+                                                <div className="reel-creator-row flex align-center gap-10 mb-10">
+                                                    <div className="reel-avatar-wrap">
+                                                        <div className="reel-avatar-inner">
+                                                            {reel.creatorId?.profilePic ? (
+                                                                <img
+                                                                    src={`${CONFIG.UPLOADS_BASE}${reel.creatorId.profilePic}`}
+                                                                    alt=""
+                                                                    className="reel-avatar-img"
+                                                                />
+                                                            ) : (
+                                                                <div className="reel-avatar-fallback">
+                                                                    {reel.creatorId?.fullName?.charAt(0)}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div
+                                                        className="reel-creator cursor-pointer font-bold"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            openCreatorProfile(reel.creatorId?._id, reel.creatorId?.fullName);
+                                                        }}
+                                                    >
+                                                        {reel.creatorId?.fullName?.replace(/\s+/g, "").toLowerCase()}
+                                                    </div>
+                                                    {user.id !== reel.creatorId?._id && (
+                                                        <button
+                                                            className={`btn-follow-pill ${user.following?.includes(reel.creatorId?._id) ? "following" : ""}`}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleFollow(reel.creatorId?._id);
+                                                            }}
+                                                        >
+                                                            {user.following?.includes(reel.creatorId?._id) ? "Following" : "Follow"}
+                                                        </button>
+                                                    )}
+                                                </div>
                                                 <h3 className="reel-title">{reel.title}</h3>
-                                                <div className="reel-meta-row" style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "8px" }}>
+                                                <div className="reel-meta-row flex align-center gap-12 mb-12">
                                                     <span className="reel-views-pill">👁️ {reel.views || 0} views</span>
                                                     <span className="reel-restaurant-pill">🏪 {reel.restaurantId?.restaurantName}</span>
                                                 </div>
@@ -778,7 +1052,7 @@ export default function UserDashboard() {
                                             </div>
                                             <div className="reel-actions">
                                                 <button className="reel-action-btn" onClick={() => handleLike(reel._id)}>
-                                                    <span className="icon" style={{ color: reel.likedBy?.includes(user.id) ? "#ff512f" : "#fff" }}>
+                                                    <span className={`icon ${reel.likedBy?.includes(user.id) ? "text-brand-important" : "text-white"}`}>
                                                         {reel.likedBy?.includes(user.id) ? "❤️" : "🤍"}
                                                     </span>
                                                     <span>{reel.likedBy?.length || 0}</span>
@@ -879,10 +1153,10 @@ export default function UserDashboard() {
                     <div>
                         {activeOrders.length > 0 && (
                             <>
-                                <h2 className="section-title" style={{ marginBottom: 16 }}>
+                                <h2 className="section-title mb-16">
                                     🔥 Active Orders
                                 </h2>
-                                <div className="orders-list" style={{ marginBottom: 40 }}>
+                                <div className="orders-list mb-32">
                                     {activeOrders.map((order) => (
                                         <div className="order-card" key={order._id}>
                                             {/* ... order card content remains unchanged ... */}
@@ -899,14 +1173,14 @@ export default function UserDashboard() {
                                                 </span>
                                             </div>
                                             {order.status === "cancel_requested" && (
-                                                <div className="rejection-reason" style={{ margin: "0 16px 16px", color: "#fca5a5", background: "rgba(239, 68, 68, 0.05)", fontSize: "0.85rem", textAlign: "center" }}>
+                                                <div className="rejection-reason m-x-16 mb-16 text-danger-light bg-glass-light text-sm text-center">
                                                     ⏳ Your cancellation request is pending operator approval.
                                                 </div>
                                             )}
 
                                             <div className="tracking-progress">
                                                 {TRACKING_STEPS.map((step, i) => (
-                                                    <span key={step.key} style={{ display: "contents" }}>
+                                                    <span key={step.key} className="flex-contents">
                                                         <div className={`tracking-step ${getStepState(order, step.key)}`}>
                                                             <div className="tracking-dot">{step.icon}</div>
                                                             <div className="tracking-label">{step.label}</div>
@@ -943,8 +1217,23 @@ export default function UserDashboard() {
                                             </div>
 
                                             <div className="order-footer">
-                                                <div className="order-total">
-                                                    <span>Total</span>₹{order.totalAmount}
+                                                <div className="order-total-container">
+                                                    <div className="order-total">
+                                                        <span>Total</span>
+                                                        {order.studentDiscountApplied ? (
+                                                            <div className="flex align-center gap-8">
+                                                                <s style={{ opacity: 0.4, fontSize: 13 }}>₹{order.totalAmount + (order.discountAmount || 0)}</s>
+                                                                <span>₹{order.totalAmount}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span>₹{order.totalAmount}</span>
+                                                        )}
+                                                    </div>
+                                                    {order.studentDiscountApplied && (
+                                                        <div className="order-student-badge">
+                                                            🎓 20% Student Off
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {/* Payment status badge */}
@@ -952,11 +1241,10 @@ export default function UserDashboard() {
                                                     {order.paymentMethod?.toUpperCase()} • {order.paymentStatus === "paid" ? "✅ Paid" : order.paymentStatus === "refunded" ? "🔄 Refunded" : "⏳ Unpaid"}
                                                 </span>
 
-                                                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                                                <div className="flex align-center gap-8">
                                                     {(order.status === "pending" || order.status === "confirmed") && (
                                                         <button
-                                                            className="btn-status"
-                                                            style={{ padding: "8px 12px", borderRadius: "10px", background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.2)", fontSize: "12px", fontWeight: "700" }}
+                                                            className="btn-status btn-danger-soft"
                                                             onClick={() => setCancellationModal({ show: true, orderId: order._id, reason: "" })}
                                                         >
                                                             Cancel Order
@@ -987,12 +1275,12 @@ export default function UserDashboard() {
 
                         {pastOrders.length > 0 && (
                             <>
-                                <h2 className="section-title" style={{ marginBottom: 16 }}>
+                                <h2 className="section-title mb-16">
                                     📋 Order History
                                 </h2>
                                 <div className="orders-list">
                                     {pastOrders.map((order) => (
-                                        <div className="order-card" key={order._id} style={{ opacity: 0.7 }}>
+                                        <div className="order-card opacity-70" key={order._id}>
                                             {/* ... past order content ... */}
                                             <div className="order-header">
                                                 <div>
@@ -1008,20 +1296,19 @@ export default function UserDashboard() {
                                             </div>
                                             <div className="order-items">
                                                 {order.items.map((item, i) => (
-                                                    <div className="order-item" key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", paddingBottom: "12px" }}>
+                                                    <div className="order-item border-bottom-glass pb-12" key={i}>
                                                         <div className="order-item-left">
                                                             <div>
                                                                 <div className="order-item-name">{item.name}</div>
                                                                 <div className="order-item-qty">Qty: {item.quantity}</div>
                                                             </div>
                                                         </div>
-                                                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
+                                                        <div className="flex-col align-end gap-2">
                                                             <div className="order-item-price">₹{item.price * item.quantity}</div>
                                                             {order.status === "delivered" && (
                                                                 <button
-                                                                    className="btn-status"
-                                                                    style={{ padding: "4px 10px", fontSize: "10px", borderRadius: "8px" }}
-                                                                    onClick={() => setRatingModal({ show: true, item: item, orderId: order._id })}
+                                                                    className="btn-status py-4 px-10 text-xs rounded-8"
+                                                                    onClick={() => openRatingModal(item, order._id)}
                                                                 >
                                                                     ⭐ Rate Item
                                                                 </button>
@@ -1030,8 +1317,28 @@ export default function UserDashboard() {
                                                     </div>
                                                 ))}
                                             </div>
-                                            <div className="order-total">
-                                                <span>Total</span>₹{order.totalAmount}
+                                            <div className="order-footer">
+                                                <div className="order-total-container">
+                                                    <div className="order-total">
+                                                        <span>Total</span>
+                                                        {order.studentDiscountApplied ? (
+                                                            <div className="flex align-center gap-8">
+                                                                <s style={{ opacity: 0.4, fontSize: 13 }}>₹{order.totalAmount + (order.discountAmount || 0)}</s>
+                                                                <span>₹{order.totalAmount}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span>₹{order.totalAmount}</span>
+                                                        )}
+                                                    </div>
+                                                    {order.studentDiscountApplied && (
+                                                        <div className="order-student-badge">
+                                                            🎓 20% Student Off
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <span className={`payment-badge ${order.paymentStatus}`}>
+                                                    {order.paymentMethod?.toUpperCase()} • {order.paymentStatus === "paid" ? "✅ Paid" : order.paymentStatus === "refunded" ? "🔄 Refunded" : "⏳ Unpaid"}
+                                                </span>
                                             </div>
 
 
@@ -1041,7 +1348,7 @@ export default function UserDashboard() {
                                                 </div>
                                             )}
                                             {order.status === "cancelled" && order.cancellationReason && (
-                                                <div className="rejection-reason" style={{ color: "#fca5a5", background: "rgba(248, 113, 113, 0.05)", border: "1px solid rgba(248, 113, 113, 0.1)" }}>
+                                                <div className="rejection-reason text-danger-light bg-glass-light border-danger-light">
                                                     Cancellation Reason: {order.cancellationReason}
                                                 </div>
                                             )}
@@ -1081,152 +1388,239 @@ export default function UserDashboard() {
                             </button>
                         </div>
 
-                        <div className="cart-items">
-                            {cart.length === 0 ? (
-                                <div className="empty-state">
-                                    <div className="empty-icon">🛒</div>
-                                    <div className="empty-title">Cart is empty</div>
-                                </div>
-                            ) : (
-                                cart.map((item) => (
-                                    <div className="cart-item" key={item.menuItemId}>
-                                        <div className="cart-item-info">
-                                            <div className="cart-item-name">{item.name}</div>
-                                            <div className="cart-item-detail">
-                                                {item.quantity} × ₹{item.price} • {item.restaurantName}
-                                            </div>
-                                        </div>
-                                        <div className="cart-item-total">₹{item.price * item.quantity}</div>
-                                        <button
-                                            className="cart-remove"
-                                            onClick={() => removeFromCart(item.menuItemId)}
-                                        >
-                                            ✕
-                                        </button>
+                        <div className="cart-body">
+                            <div className="cart-items">
+                                {cart.length === 0 ? (
+                                    <div className="empty-state">
+                                        <div className="empty-icon">🛒</div>
+                                        <div className="empty-title">Cart is empty</div>
                                     </div>
-                                ))
-                            )}
-                        </div>
-
-                        {cart.length > 0 && (
-                            <div style={{ padding: "0 20px" }}>
-                                <div style={{ display: 'flex', gap: '8px', marginBottom: '15px' }}>
-                                    <button
-                                        className="btn-nutrition"
-                                        style={{ flex: 1, justifyContent: "center", margin: 0 }}
-                                        onClick={fetchCartNutrition}
-                                        disabled={loadingCartNutrition}
-                                    >
-                                        {loadingCartNutrition ? "Analysing…" : cartNutrition ? "🔬 Refresh Nutrition" : "🔬 Check Cart Nutrition"}
-                                    </button>
-                                    {cartNutrition && !loadingCartNutrition && (
-                                        <button
-                                            className="btn-nutrition"
-                                            style={{
-                                                margin: 0,
-                                                background: 'rgba(244, 63, 94, 0.08)',
-                                                borderColor: 'rgba(244, 63, 94, 0.2)',
-                                                color: '#fb7185'
-                                            }}
-                                            onClick={() => setCartNutrition(null)}
-                                        >
-                                            ✕ Remove
-                                        </button>
-                                    )}
-                                </div>
-
-                                {cartNutrition && (
-                                    <div className="nutrition-panel" style={{ margin: "0 0 20px 0", position: 'relative' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                                            <div className="nutrition-title" style={{ margin: 0 }}>🥗 Cart Nutrition (AI Estimate)</div>
+                                ) : (
+                                    cart.map((item) => (
+                                        <div className="cart-item" key={item.menuItemId}>
+                                            <div className="cart-item-info">
+                                                <div className="cart-item-name">{item.name}</div>
+                                                <div className="cart-item-detail">
+                                                    {item.quantity} × ₹{item.price} • {item.restaurantName}
+                                                </div>
+                                            </div>
+                                            <div className="cart-item-total">₹{item.price * item.quantity}</div>
                                             <button
-                                                onClick={() => setCartNutrition(null)}
-                                                style={{
-                                                    background: 'rgba(255,255,255,0.05)',
-                                                    border: 'none',
-                                                    color: '#9ae6b4',
-                                                    cursor: 'pointer',
-                                                    fontSize: '14px',
-                                                    width: '24px',
-                                                    height: '24px',
-                                                    borderRadius: '50%',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    transition: 'all 0.2s'
-                                                }}
-                                                onMouseOver={(e) => {
-                                                    e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-                                                    e.currentTarget.style.color = '#fff';
-                                                }}
-                                                onMouseOut={(e) => {
-                                                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                                                    e.currentTarget.style.color = '#9ae6b4';
-                                                }}
-                                                title="Close Nutrition Info"
+                                                className="cart-remove"
+                                                onClick={() => removeFromCart(item.menuItemId)}
                                             >
                                                 ✕
                                             </button>
                                         </div>
-                                        <div className="nutrition-summary">
-                                            <div className="nutr-pill orange">🔥 {cartNutrition.totalCalories} kcal</div>
-                                            <div className="nutr-pill blue">💪 {cartNutrition.protein} protein</div>
-                                            <div className="nutr-pill yellow">🍞 {cartNutrition.carbs} carbs</div>
-                                            <div className="nutr-pill red">🧈 {cartNutrition.fat} fat</div>
-                                            <div className="nutr-pill green">🌿 {cartNutrition.fiber} fiber</div>
+                                    ))
+                                )}
+                            </div>
+
+                            {cart.length > 0 && (
+                                <>
+                                    <div className="px-20">
+                                        <div className="flex gap-8 mb-16">
+                                            <button
+                                                className="btn-nutrition flex-grow flex-center m-0"
+                                                onClick={fetchCartNutrition}
+                                                disabled={loadingCartNutrition}
+                                            >
+                                                {loadingCartNutrition ? "Analysing…" : cartNutrition ? "🔬 Refresh Nutrition" : "🔬 Check Cart Nutrition"}
+                                            </button>
+                                            {cartNutrition && !loadingCartNutrition && (
+                                                <button
+                                                    className="btn-nutrition m-0 btn-danger-soft"
+                                                    onClick={() => setCartNutrition(null)}
+                                                >
+                                                    ✕ Remove
+                                                </button>
+                                            )}
                                         </div>
-                                        <div className="nutrition-items">
-                                            {cartNutrition.items?.map((ni, i) => (
-                                                <div className="nutr-item-row" key={i}>
-                                                    <span className="nutr-item-name" style={{ fontSize: "11px" }}>{ni.name}</span>
-                                                    <span className="nutr-item-stats" style={{ fontSize: "10px" }}>{ni.calories} kcal · P:{ni.protein}</span>
+
+                                        {cartNutrition && (
+                                            <div className="nutrition-panel m-0 relative">
+                                                <div className="flex-between mb-12">
+                                                    <div className="nutrition-title m-0">🥗 Cart Nutrition (AI Estimate)</div>
+                                                    <button
+                                                        onClick={() => setCartNutrition(null)}
+                                                        className="btn-icon-close"
+                                                        title="Close Nutrition Info"
+                                                    >
+                                                        ✕
+                                                    </button>
                                                 </div>
-                                            ))}
+                                                <div className="nutrition-summary">
+                                                    <div className="nutr-pill orange">🔥 {cartNutrition.totalCalories} kcal</div>
+                                                    <div className="nutr-pill blue">💪 {cartNutrition.protein} protein</div>
+                                                    <div className="nutr-pill yellow">🍞 {cartNutrition.carbs} carbs</div>
+                                                    <div className="nutr-pill red">🧈 {cartNutrition.fat} fat</div>
+                                                    <div className="nutr-pill green">🌿 {cartNutrition.fiber} fiber</div>
+                                                </div>
+                                                <div className="nutrition-items">
+                                                    {cartNutrition.items?.map((ni, i) => (
+                                                        <div className="nutr-item-row" key={i}>
+                                                            <span className="nutr-item-name text-xs">{ni.name}</span>
+                                                            <span className="nutr-item-stats text-xs">{ni.calories} kcal · P:{ni.protein}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Student Discount Section (Now inside scrollable body) */}
+                                    <div className="px-20 mt-16">
+                                        <div className="student-discount-section">
+                                            <div className="student-discount-row">
+                                                <div className="student-discount-info">
+                                                    <span className="student-icon">🎓</span>
+                                                    <div>
+                                                        <div className="student-label">Student Discount (20% off)</div>
+                                                        {studentVerified ? (
+                                                            <div className="student-inst">{studentInfo?.institutionName}</div>
+                                                        ) : (
+                                                            <div className="student-not-verified">
+                                                                Not verified —{" "}
+                                                                <button className="student-link-btn" onClick={() => setStudentModal(true)}>
+                                                                    Verify ID
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {studentVerified ? (
+                                                    <label className="student-toggle">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={applyStudentDiscount}
+                                                            onChange={(e) => setApplyStudentDiscount(e.target.checked)}
+                                                        />
+                                                        <span className="toggle-track">
+                                                            <span className="toggle-thumb" />
+                                                        </span>
+                                                    </label>
+                                                ) : (
+                                                    <button className="student-verify-btn" onClick={() => setStudentModal(true)}>
+                                                        Verify
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {studentVerified && (
+                                                <button className="student-revoke-link" onClick={handleRevokeStudent}>
+                                                    🗑 Remove verification
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
-                                )}
-                            </div>
-                        )}
+                                    {/* Delivery Details Section */}
+                                    <div className="px-20 mt-20">
+                                        <div className="delivery-details-card">
+                                            <div className="flex-between mb-16">
+                                                <div className="delivery-title">📍 Delivery Details</div>
+                                                {(phone || address) && !isEditingAddress && (
+                                                    <button
+                                                        className="delivery-edit-btn"
+                                                        onClick={() => setIsEditingAddress(true)}
+                                                    >
+                                                        <span>✏️ Edit</span>
+                                                    </button>
+                                                )}
+                                            </div>
 
-                        <div className="cart-footer">
-                            <div className="cart-total-row">
-                                <div className="cart-total-label">Total Amount</div>
-                                <div className="cart-total-amount">₹{cartTotal}</div>
-                            </div>
-
-                            {/* Payment method selector */}
-                            <div style={{ marginBottom: 14 }}>
-                                <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>Payment Method</div>
-                                <div style={{ display: "flex", gap: 10 }}>
-                                    {["cod", "upi"].map(m => (
-                                        <button
-                                            key={m}
-                                            onClick={() => setPaymentMethod(m)}
-                                            style={{
-                                                flex: 1, padding: "10px", border: `1px solid ${paymentMethod === m ? "#ff512f" : "rgba(255,255,255,0.1)"}`,
-                                                borderRadius: 12, background: paymentMethod === m ? "rgba(255,81,47,0.18)" : "rgba(255,255,255,0.04)",
-                                                color: paymentMethod === m ? "#fff" : "rgba(255,255,255,0.5)",
-                                                fontFamily: "inherit", fontWeight: 700, fontSize: 13, cursor: "pointer", transition: "all 0.2s",
-                                            }}
-                                        >
-                                            {m === "cod" ? "💵 Cash on Delivery" : "📱 UPI Payment"}
-                                        </button>
-                                    ))}
-                                </div>
-                                {paymentMethod === "upi" && (
-                                    <div style={{ marginTop: 8, fontSize: 12, color: "rgba(255,200,100,0.8)", padding: "8px 12px", background: "rgba(255,200,0,0.06)", borderRadius: 8, border: "1px solid rgba(255,200,0,0.15)" }}>
-                                        ⚡ You'll confirm payment before the order is placed.
+                                            {(!phone || !address || isEditingAddress) ? (
+                                                <div className="flex-col gap-5">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Phone Number"
+                                                        value={phone}
+                                                        onChange={(e) => setPhone(e.target.value)}
+                                                        className="student-input"
+                                                    />
+                                                    <textarea
+                                                        placeholder="Complete Delivery Address"
+                                                        value={address}
+                                                        onChange={(e) => setAddress(e.target.value)}
+                                                        className="student-input"
+                                                        style={{ minHeight: '100px', resize: 'none' }}
+                                                    />
+                                                    {isEditingAddress && (
+                                                        <button className="btn-nutrition py-8 w-100 font-700" onClick={() => setIsEditingAddress(false)}>
+                                                            ✅ Save & Use This Address
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="saved-address-box">
+                                                    <div className="saved-phone">📞 {phone}</div>
+                                                    <div className="saved-address">🏠 {address}</div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                )}
-                            </div>
 
-                            <button
-                                className="btn-checkout"
-                                onClick={handleCheckout}
-                                disabled={cart.length === 0 || loading}
-                            >
-                                {loading ? "Processing..." : paymentMethod === "upi" ? `Pay via UPI • ₹${cartTotal}` : `Place Order (COD) • ₹${cartTotal}`}
-                            </button>
+                                    {/* Order Instructions Section */}
+                                    <div className="px-20 mt-20 mb-20">
+                                        <div className="instructions-card">
+                                            <div className="delivery-title mb-12">📝 Special Instructions</div>
+                                            <textarea
+                                                placeholder="e.g. Add extra cheese, use fresh dough, no onions... (Extra charges may apply)"
+                                                value={instructions}
+                                                onChange={(e) => setInstructions(e.target.value)}
+                                                className="instructions-input"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Checkout Details (Now Scrollable) */}
+                                    <div className="cart-footer-scrollable">
+                                        {/* Pricing Breakdown */}
+                                        <div className="cart-total-row">
+                                            <div className="cart-total-label">Subtotal</div>
+                                            <div className="cart-total-amount">₹{cartTotal}</div>
+                                        </div>
+                                        {applyStudentDiscount && studentVerified && (
+                                            <div className="cart-discount-row">
+                                                <div className="cart-discount-label">🎓 Student Discount (20%)</div>
+                                                <div className="cart-discount-amount">- ₹{discountAmount}</div>
+                                            </div>
+                                        )}
+                                        <div className="cart-total-row cart-grand-total">
+                                            <div className="cart-total-label" style={{ fontWeight: 900 }}>Total Payable</div>
+                                            <div className="cart-total-amount">{applyStudentDiscount && studentVerified ? <><s style={{ opacity: 0.4, fontSize: 14 }}>₹{cartTotal}</s> ₹{discountedTotal}</> : `₹${cartTotal}`}</div>
+                                        </div>
+
+                                        {/* Payment method selector */}
+                                        <div className="ud-payment-section">
+                                            <div className="ud-payment-label">Payment Method</div>
+                                            <div className="ud-payment-methods">
+                                                {["cod", "upi"].map(m => (
+                                                    <button
+                                                        key={m}
+                                                        onClick={() => setPaymentMethod(m)}
+                                                        className={`ud-payment-btn ${paymentMethod === m ? "active" : ""}`}
+                                                    >
+                                                        {m === "cod" ? "💵 Cash on Delivery" : "📱 UPI Payment"}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            {paymentMethod === "upi" && (
+                                                <div className="ud-upi-info">
+                                                    ⚡ You'll confirm payment before the order is placed.
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <button
+                                            className="btn-checkout"
+                                            onClick={handleCheckout}
+                                            disabled={cart.length === 0 || loading}
+                                        >
+                                            {loading ? "Processing..." : paymentMethod === "upi" ? `Pay via UPI • ₹${discountedTotal}` : `Place Order (COD) • ₹${discountedTotal}`}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </>
@@ -1239,8 +1633,8 @@ export default function UserDashboard() {
                         <div className="modal-title">⭐ Rate {ratingModal.item.name}</div>
                         <form onSubmit={handleRate}>
                             <div className="modal-body">
-                                <p>How was your meal from {ratingModal.item.restaurantName}?</p>
-                                <div className="star-rating" style={{ margin: "20px 0", justifyContent: "center" }}>
+                                <p className="mb-16 opacity-70">How was your meal from {ratingModal.item.restaurantName}?</p>
+                                <div className="star-rating-box mb-24">
                                     {[1, 2, 3, 4, 5].map((num) => (
                                         <span
                                             key={num}
@@ -1251,7 +1645,7 @@ export default function UserDashboard() {
                                         </span>
                                     ))}
                                 </div>
-                                <label style={{ fontSize: "0.9rem", fontWeight: 600 }}>Optional Comment:</label>
+                                <label className="ud-modal-label">Optional Comment:</label>
                                 <textarea
                                     className="textarea-input"
                                     placeholder="Share your feedback..."
@@ -1259,9 +1653,9 @@ export default function UserDashboard() {
                                     onChange={(e) => setUserComment(e.target.value)}
                                 />
                             </div>
-                            <div className="modal-actions">
-                                <button type="button" className="btn-icon" onClick={() => setRatingModal({ show: false, item: null })}>Cancel</button>
-                                <button type="submit" className="btn-primary" disabled={loading}>
+                            <div className="modal-actions gap-12">
+                                <button type="button" className="btn-secondary" onClick={() => setRatingModal({ show: false, item: null })}>Cancel</button>
+                                <button type="submit" className="btn-primary flex-grow" disabled={loading}>
                                     {loading ? "Submitting..." : "Submit Rating"}
                                 </button>
                             </div>
@@ -1276,8 +1670,8 @@ export default function UserDashboard() {
                     <div className="modal-content">
                         <div className="modal-title">🚫 Cancel Order</div>
                         <div className="modal-body">
-                            <p style={{ marginBottom: "15px" }}>Are you sure you want to cancel this order? Please tell us why:</p>
-                            <label style={{ fontSize: "0.9rem", fontWeight: 600 }}>Reason for cancellation:</label>
+                            <p className="ud-mb-15">Are you sure you want to cancel this order? Please tell us why:</p>
+                            <label className="ud-modal-label">Reason for cancellation:</label>
                             <textarea
                                 className="textarea-input"
                                 placeholder="I changed my mind / Ordered by mistake..."
@@ -1285,12 +1679,11 @@ export default function UserDashboard() {
                                 onChange={(e) => setCancellationModal({ ...cancellationModal, reason: e.target.value })}
                             />
                         </div>
-                        <div className="modal-actions">
-                            <button type="button" className="btn-icon" onClick={() => setCancellationModal({ show: false, orderId: null, reason: "" })}>Go Back</button>
+                        <div className="modal-actions gap-12">
+                            <button type="button" className="btn-secondary" onClick={() => setCancellationModal({ show: false, orderId: null, reason: "" })}>Go Back</button>
                             <button
                                 type="button"
-                                className="btn-primary"
-                                style={{ background: "#ef4444" }}
+                                className="btn-primary btn-danger flex-grow"
                                 onClick={handleCancelOrder}
                                 disabled={loading}
                             >
@@ -1304,53 +1697,53 @@ export default function UserDashboard() {
             {/* REVIEW PANEL MODAL */}
             {reviewPanel.show && (
                 <div className="modal-overlay" onClick={() => setReviewPanel({ show: false, item: null })}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "500px" }}>
-                        <div className="modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                            <div className="modal-title" style={{ margin: 0 }}>💬 Reviews: {reviewPanel.item.name}</div>
-                            <button className="close-btn" onClick={() => setReviewPanel({ show: false, item: null })} style={{ background: "none", border: "none", color: "#fff", fontSize: "1.2rem", cursor: "pointer" }}>✕</button>
+                    <div className="modal-content max-w-500" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header flex-between mb-24">
+                            <div className="modal-title m-0">💬 Reviews: {reviewPanel.item.name}</div>
+                            <button className="close-btn" onClick={() => setReviewPanel({ show: false, item: null })}>✕</button>
                         </div>
-                        <div className="modal-body" style={{ maxHeight: "60vh", overflowY: "auto" }}>
-                            <div className="review-stats" style={{ display: "flex", alignItems: "center", gap: "15px", padding: "15px", background: "rgba(255,255,255,0.05)", borderRadius: "12px", marginBottom: "20px" }}>
-                                <div style={{ fontSize: "2rem", fontWeight: "bold", color: "#ff512f" }}>
+                        <div className="modal-body max-h-60vh overflow-y-auto">
+                            <div className="review-stats-card">
+                                <div className="review-avg-num">
                                     {reviewPanel.item.averageRating || "0.0"}
                                 </div>
                                 <div>
-                                    <div className="star-rating">
+                                    <div className="star-rating flex gap-4">
                                         {[1, 2, 3, 4, 5].map(n => (
-                                            <span key={n} style={{ color: reviewPanel.item.averageRating >= n ? "#ff512f" : "rgba(255,255,255,0.2)" }}>★</span>
+                                            <span key={n} className={reviewPanel.item.averageRating >= n ? "text-amber" : "text-muted"}>★</span>
                                         ))}
                                     </div>
-                                    <div style={{ fontSize: "0.8rem", opacity: 0.6 }}>Based on {reviewPanel.item.ratings?.length || 0} reviews</div>
+                                    <div className="text-xs text-muted">Based on {reviewPanel.item.ratings?.length || 0} reviews</div>
                                 </div>
                             </div>
 
-                            <div className="reviews-list" style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+                            <div className="reviews-list-container">
                                 {reviewPanel.item.ratings?.length > 0 ? (
                                     reviewPanel.item.ratings.map((r, i) => (
-                                        <div key={i} className="review-item" style={{ padding: "12px", background: "rgba(255,255,255,0.03)", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.05)" }}>
-                                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                                                <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "#60a5fa" }}>{r.userName || `User ${r.userId?.slice(-4)}`}</div>
-                                                <div style={{ color: "#ff512f", fontSize: "0.8rem" }}>{"★".repeat(r.rating)}</div>
+                                        <div key={i} className="review-item-card">
+                                            <div className="flex-between mb-8">
+                                                <div className="review-user-name">{r.userName || `User ${r.userId?.slice(-4)}`}</div>
+                                                <div className="text-amber text-sm">{"★".repeat(r.rating)}</div>
                                             </div>
-                                            <div style={{ fontSize: "0.85rem", opacity: 0.8, lineHeight: "1.4", marginBottom: "10px" }}>{r.comment || "No comment left."}</div>
+                                            <div className="review-text">{r.comment || "No comment left."}</div>
 
-                                            <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: r.replies?.length > 0 ? "10px" : "0" }}>
+                                            <div className={`flex align-center gap-12 ${r.replies?.length > 0 ? "mb-16" : "m-0"}`}>
                                                 <button
                                                     onClick={() => handleLikeRating(reviewPanel.item._id, r._id)}
-                                                    style={{ background: "none", border: "none", color: r.likes?.includes(user.id) ? "#ff512f" : "#fff", cursor: "pointer", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "4px", padding: 0 }}
+                                                    className={`btn-icon-text text-xs flex align-center gap-4 ${r.likes?.includes(user.id) ? "text-brand" : "opacity-50"}`}
                                                 >
                                                     {r.likes?.includes(user.id) ? "❤️" : "🤍"} {r.likes?.length || 0}
                                                 </button>
-                                                <div style={{ fontSize: "0.7rem", opacity: 0.4 }}>{new Date(r.createdAt).toLocaleDateString()}</div>
+                                                <div className="text-xs opacity-30">{new Date(r.createdAt).toLocaleDateString()}</div>
                                             </div>
 
                                             {/* Operator Replies */}
                                             {r.replies?.length > 0 && (
-                                                <div style={{ marginLeft: "10px", paddingLeft: "10px", borderLeft: "2px solid rgba(255,255,255,0.1)", display: "flex", flexDirection: "column", gap: "8px" }}>
+                                                <div className="ml-12 pl-12 border-left border-white-10 flex flex-col gap-8">
                                                     {r.replies.map((reply, ri) => (
-                                                        <div key={ri} style={{ background: "rgba(255,255,255,0.02)", padding: "6px 10px", borderRadius: "8px" }}>
-                                                            <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#9ae6b4" }}>{reply.userName}</div>
-                                                            <div style={{ fontSize: "0.8rem", opacity: 0.8 }}>{reply.text}</div>
+                                                        <div key={ri} className="bg-white-5 p-10 rounded-12">
+                                                            <div className="text-xs font-bold text-success opacity-80 mb-2">{reply.userName}</div>
+                                                            <div className="text-sm opacity-70">{reply.text}</div>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -1358,8 +1751,8 @@ export default function UserDashboard() {
                                         </div>
                                     ))
                                 ) : (
-                                    <div style={{ textAlign: "center", padding: "40px 0", opacity: 0.5 }}>
-                                        <div style={{ fontSize: "2rem" }}>😶</div>
+                                    <div className="text-center py-40 opacity-30">
+                                        <div className="text-4xl mb-12">😶</div>
                                         <p>No reviews yet for this item.</p>
                                     </div>
                                 )}
@@ -1372,41 +1765,119 @@ export default function UserDashboard() {
             {/* UPI PAYMENT MODAL */}
             {upiModal.show && (
                 <div className="modal-overlay">
-                    <div className="modal-content" style={{ maxWidth: 380, textAlign: "center" }}>
-                        <div style={{ fontSize: 48, marginBottom: 12 }}>📱</div>
-                        <div className="modal-title">UPI Payment</div>
+                    <div className="modal-content max-w-400 text-center">
+                        <div className="text-6xl mb-16">📱</div>
+                        <div className="modal-title mb-24">UPI Payment</div>
                         <div className="modal-body">
-                            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: "24px 20px", marginBottom: 20 }}>
-                                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Pay to</div>
-                                <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", marginBottom: 16 }}>FoodMenia Merchants</div>
-                                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Amount</div>
-                                <div style={{ fontSize: 32, fontWeight: 900, background: "linear-gradient(135deg,#ff512f,#f09819)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>₹{upiModal.amount}</div>
-                                <div style={{ marginTop: 20, padding: "10px", background: "rgba(255,200,0,0.08)", border: "1px dashed rgba(255,200,0,0.3)", borderRadius: 10, fontSize: 12, color: "rgba(255,220,100,0.8)" }}>
+                            <div className="payment-card">
+                                <div className="text-xs font-bold opacity-30 mb-8 uppercase letter-spacing-1">Pay to</div>
+                                <div className="text-lg font-black text-white mb-20">FoodMenia Merchants</div>
+                                <div className="text-xs font-bold opacity-30 mb-8 uppercase letter-spacing-1">Amount</div>
+                                <div className="payment-amount">₹{upiModal.amount}</div>
+                                <div className="simulated-badge mt-24">
                                     🔐 Simulated UPI transaction<br />UPI ID: foodmenia@okaxis
                                 </div>
                             </div>
-                            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>
-                                Tap <strong style={{ color: "#fff" }}>Confirm Payment</strong> to simulate completing the UPI transaction.
-                                Your order will be placed and marked as paid instantly.
+                            <p className="text-sm opacity-50 px-20">
+                                Tap <strong className="text-white">Confirm Payment</strong> to simulate completing the UPI transaction securely.
                             </p>
                         </div>
-                        <div className="modal-actions" style={{ gap: 10 }}>
+                        <div className="modal-actions gap-12">
                             <button
-                                className="btn-icon"
+                                className="btn-secondary"
                                 onClick={() => { setUpiModal({ show: false, orderId: null, amount: 0 }); setPendingCheckoutData(null); }}
                                 disabled={loading}
                             >
                                 Cancel
                             </button>
                             <button
-                                className="btn-primary"
+                                className="btn-primary flex-grow"
                                 onClick={handleUpiConfirm}
                                 disabled={loading}
-                                style={{ flex: 1 }}
                             >
                                 {loading ? "Processing..." : "✅ Confirm Payment"}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* STUDENT ID VERIFICATION MODAL */}
+            {studentModal && (
+                <div className="modal-overlay" onClick={() => setStudentModal(false)}>
+                    <div className="modal-content student-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="student-modal-header">
+                            <div className="student-modal-icon">🎓</div>
+                            <div>
+                                <div className="modal-title m-0">Student Verification</div>
+                                <div className="student-modal-sub">Get 20% off on every order</div>
+                            </div>
+                            <button className="close-btn" onClick={() => setStudentModal(false)}>✕</button>
+                        </div>
+
+                        <form className="modal-body" onSubmit={handleStudentVerify}>
+                            <div className="student-form-info">
+                                <span>📋</span>
+                                <p>Upload your valid student ID card. We verify your institution and card validity date.</p>
+                            </div>
+
+                            <div className="student-form-group">
+                                <label>Institution Name *</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. IIT Delhi, St. Xavier's College..."
+                                    value={studentForm.institutionName}
+                                    onChange={(e) => setStudentForm({ ...studentForm, institutionName: e.target.value })}
+                                    className="student-input"
+                                    required
+                                />
+                            </div>
+
+                            <div className="student-form-group">
+                                <label>ID Card Expiry Date *</label>
+                                <input
+                                    type="date"
+                                    min={new Date().toISOString().split("T")[0]}
+                                    value={studentForm.idExpiryDate}
+                                    onChange={(e) => setStudentForm({ ...studentForm, idExpiryDate: e.target.value })}
+                                    className="student-input"
+                                    required
+                                />
+                            </div>
+
+                            <div className="student-form-group">
+                                <label>Student ID Card Image *</label>
+                                <div className="student-upload-area" onClick={() => document.getElementById("studentIdInput").click()}>
+                                    {studentForm.file ? (
+                                        <div className="student-file-selected">
+                                            <span>📎</span>
+                                            <span>{studentForm.file.name}</span>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="student-upload-icon">📸</div>
+                                            <div className="student-upload-text">Click to upload ID card photo</div>
+                                            <div className="student-upload-hint">JPG, PNG, WEBP accepted</div>
+                                        </>
+                                    )}
+                                    <input
+                                        id="studentIdInput"
+                                        type="file"
+                                        accept="image/*"
+                                        style={{ display: "none" }}
+                                        onChange={(e) => setStudentForm({ ...studentForm, file: e.target.files[0] || null })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="modal-actions">
+                                <button type="button" className="btn-secondary" onClick={() => setStudentModal(false)}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn-primary flex-grow" disabled={studentLoading}>
+                                    {studentLoading ? "Verifying..." : "🔍 Verify My ID"}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

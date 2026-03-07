@@ -45,19 +45,37 @@ router.get("/my", authMiddleware, roleMiddleware("user"), async (req, res) => {
 // =====================================================
 router.post("/", authMiddleware, roleMiddleware("user"), async (req, res) => {
   try {
-    const { operatorId, restaurantName, items, paymentMethod } = req.body;
+    const {
+      operatorId,
+      restaurantName,
+      items,
+      paymentMethod,
+      applyStudentDiscount,
+      phone,
+      address,
+      instructions
+    } = req.body;
+
+    // Validate contact info
+    if (!phone || !address) {
+      return res.status(400).json({ success: false, message: "Phone number and delivery address are required." });
+    }
+
+    // Update user profile with latest contact info (Store Permanently)
+    const User = require("../models/User");
+    await User.findByIdAndUpdate(req.user.id, { phone, address });
 
     // Validate paymentMethod
     if (!["cod", "upi"].includes(paymentMethod)) {
       return res.status(400).json({ success: false, message: "paymentMethod must be 'cod' or 'upi'." });
     }
 
+    // ... items validation and calculation ...
     // Validate items array
     if (!items || items.length === 0) {
       return res.status(400).json({ success: false, message: "No items provided." });
     }
 
-    // Validate operatorId exists in DB (prevent fake operatorIds)
     const operator = await Operator.findById(operatorId);
     if (!operator) {
       return res.status(400).json({ success: false, message: "Invalid operator." });
@@ -67,20 +85,21 @@ router.post("/", authMiddleware, roleMiddleware("user"), async (req, res) => {
     const formattedItems = [];
 
     for (const item of items) {
-      // Validate quantity (security: never trust front-end price or qty abuse)
       if (!item.menuItemId || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 50) {
-        return res.status(400).json({ success: false, message: "Invalid item quantity (must be 1–50)." });
+        return res.status(400).json({ success: false, message: "Invalid item quantity." });
       }
 
       const menuItem = await MenuItem.findById(item.menuItemId);
-      if (!menuItem) continue; // skip silently if item no longer exists
+      if (!menuItem) continue;
 
-      total += menuItem.price * item.quantity;  // always use DB price — never trust client price
+      total += menuItem.price * item.quantity;
+
+      await MenuItem.findByIdAndUpdate(menuItem._id, { $inc: { orderCount: item.quantity } });
 
       formattedItems.push({
         menuItemId: menuItem._id,
         name: menuItem.name,
-        price: menuItem.price,   // locked at time of order
+        price: menuItem.price,
         quantity: item.quantity,
         image: menuItem.image,
       });
@@ -90,17 +109,43 @@ router.post("/", authMiddleware, roleMiddleware("user"), async (req, res) => {
       return res.status(400).json({ success: false, message: "No valid menu items found." });
     }
 
+    // ── Student Discount (20%) ────────────────────────────────────
+    let studentDiscountApplied = false;
+    let discountAmount = 0;
+
+    if (applyStudentDiscount) {
+      const userRecord = await User.findById(req.user.id);
+      const isVerified = userRecord?.studentStatus === "verified";
+      const notExpired = userRecord?.idExpiryDate && userRecord.idExpiryDate > new Date();
+
+      if (isVerified && notExpired) {
+        discountAmount = Math.round(total * 0.20);
+        total = total - discountAmount;
+        studentDiscountApplied = true;
+      } else {
+        return res.status(403).json({
+          success: false,
+          message: "Student discount could not be applied. Please verify your student ID first."
+        });
+      }
+    }
+
     const order = await Order.create({
       userId: req.user.id,
       userName: req.user.fullName,
       userEmail: req.user.email,
+      customerPhone: phone,
+      customerAddress: address,
+      instructions: instructions || "",
       operatorId: operator._id,
-      restaurantName: operator.restaurantName,  // use DB value, not client value
+      restaurantName: operator.restaurantName,
       items: formattedItems,
       totalAmount: total,
       status: "pending",
       paymentMethod,
       paymentStatus: "pending",
+      studentDiscountApplied,
+      discountAmount,
     });
 
     res.json({ success: true, data: order });
@@ -183,7 +228,6 @@ router.put("/:id/status", authMiddleware, roleMiddleware("operator"), async (req
     // ─── Generate OTP when moving to out_for_delivery ───
     if (status === "out_for_delivery") {
       order.deliveryOTP = generateOTP();
-      console.log(`🔐 Delivery OTP for order ${order._id}: ${order.deliveryOTP}`); // remove in production, use SMS/email
     }
 
     order.status = status;

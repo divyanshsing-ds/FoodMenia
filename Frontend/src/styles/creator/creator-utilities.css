@@ -1,0 +1,79 @@
+/* creator-utilities.css */
+.cd-hidden {
+    display: none !important;
+}
+
+.cd-pb-20 {
+    padding-bottom: 20px;
+}
+
+.cd-flex-center-gap {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.cd-mb-12-opacity-50 {
+    opacity: 0.5;
+    margin-bottom: 12px;
+    display: block;
+}
+
+.cd-maxWidth-200-opacity-7 {
+    max-width: 200px;
+    opacity: 0.7;
+}
+
+.cd-justify-end {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.cd-search-no-results {
+    padding: 10px 14px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.4);
+    text-align: center;
+}
+
+.cd-comment-main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cd-reply-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.cd-reply-input-box {
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 16px;
+}
+
+.cd-reply-to-label {
+    font-size: 11px;
+    color: #ff512f;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cd-reply-to-label button {
+    margin-left: auto;
+}
+
+@keyframes cdFadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(18px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

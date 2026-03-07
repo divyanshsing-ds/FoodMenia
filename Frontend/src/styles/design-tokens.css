@@ -1,0 +1,101 @@
+/* design-tokens.css */
+/* Centralized Design System for FoodMenia */
+
+:root {
+    /* --- COLOR PALETTE --- */
+
+    /* Brand Colors */
+    --brand-primary: #ff512f;
+    --brand-secondary: #dd2476;
+    --brand-accent: #f09819;
+    --brand-amber: #ffbf00;
+    --brand-gradient: linear-gradient(135deg, #ff512f, #dd2476);
+    --brand-gradient-alt: linear-gradient(135deg, #dd2476, #ff512f);
+    --brand-glow: rgba(255, 81, 47, 0.15);
+
+    /* Surface Colors (Dark Theme) */
+    --bg-deep: #07070f;
+    --bg-surface: #0e0e1a;
+    --bg-card: rgba(255, 255, 255, 0.04);
+    --bg-card-hover: rgba(255, 255, 255, 0.07);
+    --bg-glass: rgba(255, 255, 255, 0.03);
+    --bg-glass-heavy: rgba(10, 10, 20, 0.85);
+
+    /* Semantic Colors */
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --info: #3b82f6;
+
+    /* Text Colors */
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.75);
+    --text-muted: rgba(255, 255, 255, 0.45);
+    --text-disabled: rgba(255, 255, 255, 0.25);
+    --text-inverse: #000000;
+
+    /* Borders */
+    --border: rgba(255, 255, 255, 0.08);
+    --border-bright: rgba(255, 255, 255, 0.15);
+    --border-active: rgba(255, 81, 47, 0.4);
+
+    /* --- SPACING SCALE --- */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+    --space-16: 64px;
+    --space-20: 80px;
+
+    /* --- BORDER RADIUS --- */
+    --radius-xs: 4px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    --radius-2xl: 32px;
+    --radius-full: 9999px;
+
+    /* --- SHADOWS --- */
+    --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.45);
+    --shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.6);
+    --shadow-glow: 0 0 30px rgba(255, 81, 47, 0.12);
+
+    /* --- TYPOGRAPHY --- */
+    --font-heading: "Outfit", "Inter", sans-serif;
+    --font-body: "Inter", -apple-system, sans-serif;
+
+    /* Font Sizes */
+    --fs-3xs: 0.625rem;
+    --fs-2xs: 0.75rem;
+    --fs-xs: 0.8125rem;
+    --fs-sm: 0.875rem;
+    --fs-base: 1rem;
+    --fs-lg: 1.125rem;
+    --fs-xl: 1.25rem;
+    --fs-2xl: 1.5rem;
+    --fs-3xl: 1.875rem;
+    --fs-4xl: 2.25rem;
+    --fs-5xl: 3rem;
+
+    /* Font Weights */
+    --fw-regular: 400;
+    --fw-medium: 500;
+    --fw-semibold: 600;
+    --fw-bold: 700;
+    --fw-extra-bold: 800;
+    --fw-black: 900;
+
+    /* --- ANIMATIONS --- */
+    --transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    --transition-slow: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    --transition-fast: all 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+}

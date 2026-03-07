@@ -14,7 +14,7 @@ const videoSchema = new mongoose.Schema(
         restaurantId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Operator",
-            required: true,
+            required: false,
         },
         likedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
         views: { type: Number, default: 0 },

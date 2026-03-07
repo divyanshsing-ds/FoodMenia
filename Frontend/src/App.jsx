@@ -4,6 +4,8 @@ import AuthPage from "./Pages/AuthPage";
 import OperatorDashboard from "./Pages/OperatorDashboard";
 import UserDashboard from "./Pages/UserDashboard";
 import CreatorDashboard from "./Pages/CreatorDashboard";
+import CreatorMessages from "./Pages/CreatorMessages";
+import CreatorPublicProfile from "./Pages/CreatorPublicProfile";
 import CONFIG from "./utils/config";
 
 function ProtectedRoute({ children, allowedRole }) {
@@ -50,6 +52,22 @@ function App() {
           element={
             <ProtectedRoute allowedRole="creator">
               <CreatorDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/creator/messages"
+          element={
+            <ProtectedRoute allowedRole="creator">
+              <CreatorMessages />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/creator-profile/:id"
+          element={
+            <ProtectedRoute allowedRole="user">
+              <CreatorPublicProfile />
             </ProtectedRoute>
           }
         />

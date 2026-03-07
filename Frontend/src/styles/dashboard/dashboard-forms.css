@@ -1,0 +1,165 @@
+/* dashboard-forms.css */
+.add-menu-form {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-8);
+    margin-bottom: var(--space-8);
+    backdrop-filter: blur(20px);
+    animation: fadeUp 0.5s var(--transition);
+}
+
+.form-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.form-group label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 14px 18px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 14px;
+    transition: all 0.3s ease;
+    outline: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+.form-group select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.5)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 18px center;
+    padding-right: 45px;
+}
+
+.form-group option {
+    background: #1a1a2e;
+    color: #fff;
+    padding: 12px;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    border-color: var(--brand-primary);
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 20px rgba(255, 81, 47, 0.15);
+}
+
+.form-actions {
+    display: flex;
+    gap: var(--space-4);
+    margin-top: var(--space-6);
+}
+
+/* Image Upload Area */
+.image-upload-area {
+    border: 2px dashed rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.02);
+    transition: var(--transition);
+}
+
+.image-upload-area:hover {
+    border-color: var(--brand-primary);
+    background: rgba(255, 81, 47, 0.03);
+}
+
+.upload-input-overlay {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.upload-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-muted);
+}
+
+.upload-icon {
+    font-size: 32px;
+}
+
+.upload-text {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.image-preview {
+    width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+    border-radius: var(--radius-md);
+    position: relative;
+    z-index: 1;
+}
+
+/* OTP CARD */
+.otp-card {
+    margin: 12px 16px;
+    padding: 16px 20px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(255, 81, 47, 0.12), rgba(221, 36, 118, 0.1));
+    border: 1px solid rgba(255, 81, 47, 0.3);
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.otp-card .otp-code {
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: 8px;
+    background: var(--brand-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}

@@ -1,0 +1,120 @@
+/* dashboard-navbar.css */
+.top-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4) var(--space-8);
+    background: var(--bg-glass);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(20px);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+}
+
+.nav-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.dash-navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4) var(--space-8);
+    background: var(--bg-glass-heavy);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: var(--shadow-sm);
+}
+
+.dash-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--fs-xl);
+    font-weight: var(--fw-black);
+    font-family: var(--font-heading);
+    letter-spacing: -0.5px;
+}
+
+.dash-brand span {
+    background: var(--brand-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.dash-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.dash-user-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    transition: var(--transition);
+}
+
+.dash-user-info:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-bright);
+}
+
+.dash-user-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff512f, #dd2476);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.dash-user-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.dash-user-role {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-logout {
+    padding: 8px 20px;
+    border: 1px solid rgba(255, 81, 47, 0.2);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 81, 47, 0.05);
+    color: #ff512f;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-logout:hover {
+    background: rgba(255, 81, 47, 0.15);
+    border-color: rgba(255, 81, 47, 0.45);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 81, 47, 0.15);
+}

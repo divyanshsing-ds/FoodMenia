@@ -1,0 +1,105 @@
+/* auth-forms.css */
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.input-group label {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-bold);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.input-group input {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    outline: none;
+    background: var(--bg-glass);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    transition: var(--transition);
+}
+
+.input-group input::placeholder {
+    color: rgba(255, 255, 255, 0.25);
+}
+
+.input-group input:focus {
+    border-color: var(--brand-primary);
+    background: var(--bg-card);
+    box-shadow: 0 0 0 4px var(--brand-glow);
+}
+
+.submit-btn {
+    margin-top: var(--space-2);
+    padding: var(--space-4);
+    border: none;
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    font-family: var(--font-heading);
+    font-size: var(--fs-base);
+    font-weight: var(--fw-black);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-primary);
+    background: var(--brand-gradient);
+    background-size: 200% auto;
+    box-shadow: var(--shadow-sm), 0 4px 15px rgba(255, 81, 47, 0.3);
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.submit-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(120deg,
+            transparent,
+            rgba(255, 255, 255, 0.2),
+            transparent);
+    transition: all 0.6s;
+}
+
+.submit-btn:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow:
+        0 12px 25px rgba(118, 75, 162, 0.5),
+        0 2px 0 rgba(255, 255, 255, 0.25) inset;
+    background-position: right center;
+}
+
+.submit-btn:hover::before {
+    left: 100%;
+}
+
+.submit-btn:active:not(:disabled) {
+    transform: translateY(-1px) scale(0.98);
+    box-shadow: 0 5px 10px rgba(102, 126, 234, 0.3);
+}
+
+.submit-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+    box-shadow: none;
+}

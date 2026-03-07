@@ -1,0 +1,69 @@
+/* auth-responsive.css */
+@media (max-width: 900px) {
+    .auth-wrapper {
+        flex-direction: column;
+    }
+
+    .left-side {
+        flex: none;
+        height: 30vh;
+        min-height: 200px;
+        animation: none;
+    }
+
+    .overlay {
+        padding: var(--space-8) var(--space-6);
+        gap: var(--space-3);
+    }
+
+    .overlay h1 {
+        font-size: var(--fs-4xl);
+    }
+
+    .overlay p {
+        font-size: var(--fs-sm);
+    }
+
+    .feature-pills {
+        display: none;
+    }
+
+    .right-side {
+        flex: 1;
+        align-items: flex-start;
+        padding-top: 24px;
+    }
+
+    .auth-card {
+        width: 92%;
+        max-width: 440px;
+        padding: var(--space-6) var(--space-4);
+    }
+}
+
+@media (max-width: 480px) {
+    .overlay {
+        padding: 20px 24px;
+    }
+
+    .overlay h1 {
+        font-size: 26px;
+    }
+
+    .auth-card {
+        padding: 24px 20px;
+        border-radius: 20px;
+    }
+
+    .role-switch button {
+        padding: 12px 6px;
+    }
+
+    .role-switch button .role-icon {
+        font-size: 20px;
+    }
+
+    .role-switch button .role-label {
+        font-size: 9px;
+    }
+}

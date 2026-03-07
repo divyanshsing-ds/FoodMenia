@@ -1,0 +1,203 @@
+/* creator-analytics.css */
+.cd-analytics-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 20px;
+    margin-bottom: 36px;
+}
+
+.cd-stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6) var(--space-4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    text-align: center;
+    transition: var(--transition);
+    backdrop-filter: blur(10px);
+}
+
+.cd-stat-card:hover {
+    border-color: var(--brand-primary);
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg), var(--shadow-glow);
+}
+
+.cd-stat-icon {
+    font-size: 28px;
+    line-height: 1;
+}
+
+.cd-stat-val {
+    font-size: 28px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #ff512f, #f09819);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
+}
+
+.cd-stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.35);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.cd-analytics-sub {
+    font-size: 16px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.cd-analytics-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.cd-analytics-row {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    display: grid;
+    grid-template-columns: 110px 1fr auto;
+    gap: var(--space-5);
+    align-items: start;
+    animation: cdFadeUp 0.4s var(--transition) both;
+    transition: var(--transition);
+}
+
+.cd-analytics-row:hover {
+    border-color: var(--border-bright);
+    background: var(--bg-card);
+}
+
+.cd-analytics-thumb {
+    width: 110px;
+    height: 75px;
+    object-fit: cover;
+    border-radius: 10px;
+    background: #0a0a18;
+    display: block;
+}
+
+.cd-analytics-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cd-analytics-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.3;
+}
+
+.cd-analytics-restaurant {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.cd-analytics-metrics {
+    display: flex;
+    gap: 20px;
+    flex-shrink: 0;
+}
+
+.cd-metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.cd-metric-icon {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.cd-metric-val {
+    font-size: 18px;
+    font-weight: 800;
+    color: #fff;
+}
+
+.cd-metric-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.cd-analytics-comments {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-4);
+    margin-top: var(--space-1);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.cd-comments-head {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: rgba(255, 255, 255, 0.3);
+    margin-bottom: 4px;
+}
+
+.cd-comment-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    padding: 10px 14px;
+}
+
+.cd-comment-user {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ff7a55;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.cd-comment-text {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1.5;
+}
+
+.cd-stat-card.cd-stat-money {
+    background: linear-gradient(135deg,
+            rgba(16, 185, 129, 0.1),
+            rgba(5, 150, 105, 0.1));
+    border-color: rgba(16, 185, 129, 0.2);
+}
+
+.cd-stat-card.cd-stat-money .cd-stat-val {
+    color: #10b981;
+}
+
+.cd-metric.cd-metric-money .cd-metric-val {
+    color: #10b981;
+}
+
+.cd-metric.cd-metric-money .cd-metric-label {
+    color: rgba(16, 185, 129, 0.5);
+}

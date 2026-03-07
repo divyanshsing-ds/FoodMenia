@@ -1,0 +1,293 @@
+/* dashboard-modals.css */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(16px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2200;
+    padding: var(--space-6);
+    animation: fadeIn 0.4s ease both;
+}
+
+.modal-content {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-bright);
+    border-radius: var(--radius-xl);
+    padding: var(--space-8);
+    width: 100%;
+    max-width: 520px;
+    box-shadow: var(--shadow-lg), 0 0 1px rgba(255, 255, 255, 0.1) inset;
+    animation: modalSlideUp 0.5s var(--transition) both;
+    position: relative;
+    overflow: hidden;
+}
+
+@keyframes modalSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.modal-title {
+    font-size: var(--fs-3xl);
+    font-weight: var(--fw-black);
+    color: var(--text-primary);
+    margin: 0;
+    letter-spacing: -0.5px;
+    font-family: var(--font-heading);
+}
+
+.modal-body {
+    margin-bottom: 24px;
+}
+
+.modal-footer,
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 32px;
+}
+
+/* Review Modal Specifics */
+.review-stats-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    background: var(--bg-card);
+    border-radius: 16px;
+    margin-bottom: 24px;
+    border: 1px solid var(--border);
+}
+
+.review-avg-num {
+    font-size: 48px;
+    font-weight: 900;
+    background: var(--brand-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+}
+
+.reviews-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: 50vh;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+.review-item-card {
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+}
+
+.review-user-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--info);
+}
+
+.review-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 8px 0;
+}
+
+.review-like-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.review-like-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.review-like-btn.liked {
+    background: rgba(255, 81, 47, 0.1);
+    border-color: rgba(255, 81, 47, 0.2);
+    color: var(--brand-primary);
+}
+
+.review-reply-area {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 4px 6px 4px 16px;
+    transition: var(--transition);
+}
+
+.review-reply-area:focus-within {
+    border-color: var(--brand-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.review-reply-input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 13px;
+    outline: none;
+    padding: 8px 0;
+}
+
+.review-reply-input::placeholder {
+    color: var(--text-muted);
+}
+
+.review-post-btn {
+    background: var(--brand-gradient);
+    border: none;
+    color: #fff;
+    padding: 6px 16px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.review-post-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(255, 81, 47, 0.3);
+}
+
+.review-post-btn:active {
+    transform: scale(0.95);
+}
+
+/* UPI Modal Specifics */
+.payment-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-bright);
+    border-radius: 20px;
+    padding: 24px;
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.payment-amount {
+    font-size: 42px;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: -1px;
+    margin: 12px 0;
+}
+
+.simulated-badge {
+    padding: 10px;
+    background: rgba(255, 193, 7, 0.08);
+    border: 1px dashed rgba(255, 193, 7, 0.3);
+    border-radius: 12px;
+    font-size: 12px;
+    color: #ffc107;
+}
+
+/* Star Rating Utility */
+.star-rating-box {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    font-size: 28px;
+}
+
+.star-rating-box .star {
+    cursor: pointer;
+    color: var(--text-disabled);
+    transition: var(--transition);
+}
+
+.star-rating-box .star.active {
+    color: var(--brand-amber);
+    text-shadow: 0 0 15px rgba(255, 191, 0, 0.4);
+}
+
+.ud-modal-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.textarea-input {
+    width: 100%;
+    background: var(--bg-glass);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: var(--fs-md);
+    line-height: 1.6;
+    resize: none;
+    min-height: 120px;
+    outline: none;
+    transition: var(--transition);
+}
+
+.textarea-input:focus {
+    border-color: var(--brand-primary);
+    background: var(--bg-card);
+    box-shadow: 0 0 20px rgba(255, 81, 47, 0.1);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes scaleUp {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}

@@ -17,6 +17,9 @@ const orderSchema = new mongoose.Schema(
             },
         ],
         totalAmount: { type: Number, required: true },
+        customerPhone: { type: String, required: true },
+        customerAddress: { type: String, required: true },
+        instructions: { type: String, default: "" },
 
         // ── Order flow ──────────────────────────────────────
         status: {
@@ -47,6 +50,10 @@ const orderSchema = new mongoose.Schema(
         // ── Reasons ──────────────────────────────────────────
         rejectionReason: { type: String, default: "" },
         cancellationReason: { type: String, default: "" },
+
+        // ── Student Discount ──────────────────────────────────
+        studentDiscountApplied: { type: Boolean, default: false },
+        discountAmount: { type: Number, default: 0 },
     },
     { timestamps: true }
 );

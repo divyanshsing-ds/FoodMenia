@@ -7,6 +7,8 @@ const creatorSchema = new mongoose.Schema(
         password: { type: String, required: true },
         role: { type: String, default: "creator", enum: ["creator"] },
         creatorBio: { type: String, default: "" },
+        profilePic: { type: String, default: "" },
+        followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     },
     { timestamps: true }
 );

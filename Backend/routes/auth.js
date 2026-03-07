@@ -2,7 +2,8 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const router = express.Router();
-const { JWT_SECRET } = require("../middleware/auth");
+const { JWT_SECRET, authMiddleware } = require("../middleware/auth");
+const upload = require("../middleware/upload");
 
 // ---------- Models ----------
 const User = require("../models/User");
@@ -84,7 +85,7 @@ router.post("/signup", async (req, res) => {
                 email: newUser.email,
                 role,
                 ...(role === "operator" && { restaurantName: newUser.restaurantName, restaurantLocation: newUser.restaurantLocation }),
-                ...(role === "creator" && { creatorBio: newUser.creatorBio }),
+                ...(role === "creator" && { creatorBio: newUser.creatorBio, profilePic: newUser.profilePic }),
             },
         });
     } catch (err) {
@@ -138,7 +139,7 @@ router.post("/login", async (req, res) => {
                 email: user.email,
                 role,
                 ...(role === "operator" && { restaurantName: user.restaurantName, restaurantLocation: user.restaurantLocation }),
-                ...(role === "creator" && { creatorBio: user.creatorBio }),
+                ...(role === "creator" && { creatorBio: user.creatorBio, profilePic: user.profilePic }),
             },
         });
     } catch (err) {
@@ -162,15 +163,30 @@ router.get("/operators", async (req, res) => {
 // ========================================================
 //  GET  /api/auth/verify
 // ========================================================
-const { authMiddleware } = require("../middleware/auth");
+
 router.get("/verify", authMiddleware, (req, res) => {
     res.json({ success: true, user: req.user });
 });
 
 // ========================================================
+//  GET  /api/auth/me (Get current DB profile)
+// ========================================================
+router.get("/me", authMiddleware, async (req, res) => {
+    try {
+        const Model = getModel(req.user.role);
+        const user = await Model.findById(req.user.id).select("-password");
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+        res.json({ success: true, data: user });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+
+// ========================================================
 //  PATCH /api/auth/profile
 // ========================================================
-router.patch("/profile", authMiddleware, async (req, res) => {
+router.patch("/profile", authMiddleware, upload.single("image"), async (req, res) => {
     try {
         const { creatorBio } = req.body;
         const role = req.user.role;
@@ -179,9 +195,16 @@ router.patch("/profile", authMiddleware, async (req, res) => {
             return res.status(403).json({ success: false, message: "Only creators can update bio." });
         }
 
+        const updateData = { creatorBio };
+
+        // If a file was uploaded, it will be the profile picture
+        if (req.file) {
+            updateData.profilePic = `/uploads/${req.file.filename}`;
+        }
+
         const updated = await Creator.findByIdAndUpdate(
             req.user.id,
-            { creatorBio },
+            updateData,
             { new: true }
         );
 
@@ -197,12 +220,29 @@ router.patch("/profile", authMiddleware, async (req, res) => {
                 fullName: updated.fullName,
                 email: updated.email,
                 role: updated.role,
-                creatorBio: updated.creatorBio
+                creatorBio: updated.creatorBio,
+                profilePic: updated.profilePic
             }
         });
     } catch (err) {
         console.error("Profile update error:", err);
         res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+
+// ========================================================
+//  GET  /api/auth/creator/:id (Public Creator Info)
+// ========================================================
+router.get("/creator/:id", async (req, res) => {
+    try {
+        const creator = await Creator.findById(req.params.id)
+            .select("fullName profilePic creatorBio followers");
+        if (!creator) {
+            return res.status(404).json({ success: false, message: "Creator not found" });
+        }
+        res.json({ success: true, data: creator });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Server error fetching creator" });
     }
 });
 

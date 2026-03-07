@@ -23,6 +23,7 @@ const menuItemSchema = new mongoose.Schema(
     ratings: [
       {
         userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        orderId: { type: mongoose.Schema.Types.ObjectId, ref: "Order" }, // Track which order this rating belongs to
         userName: { type: String, default: "Anonymous" },
         rating: { type: Number, min: 1, max: 5 },
         comment: { type: String, default: "" },
@@ -39,15 +40,26 @@ const menuItemSchema = new mongoose.Schema(
       },
     ],
     averageRating: { type: Number, default: 0 },
+
+    // ── Best Seller Tracking ──────────────────────────────
+    orderCount: { type: Number, default: 0 },       // total units ever ordered
+    isBestSeller: { type: Boolean, default: false }, // set by weekly recalculation
+    bestSellerUpdatedAt: { type: Date, default: null }, // last time badge was refreshed
   },
   { timestamps: true },
 );
 
 // Calculate average rating before saving
 menuItemSchema.pre("save", async function () {
+  // Always recalculate average rating if ratings array is present.
   if (this.ratings && this.ratings.length > 0) {
-    const sum = this.ratings.reduce((acc, r) => acc + r.rating, 0);
-    this.averageRating = Math.round((sum / this.ratings.length) * 10) / 10;
+    let total = 0;
+    this.ratings.forEach(r => {
+      total += (Number(r.rating) || 0);
+    });
+    // Calculate average and round to 1 decimal place (e.g., 4.3)
+    const avg = total / this.ratings.length;
+    this.averageRating = Math.round(avg * 10) / 10;
   } else {
     this.averageRating = 0;
   }
