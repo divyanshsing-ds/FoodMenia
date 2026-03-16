@@ -5,6 +5,19 @@ const MenuItem = require("../models/MenuItem");
 const Operator = require("../models/Operator");
 const { authMiddleware, roleMiddleware } = require("../middleware/auth");
 
+// Helper to get socket.io from app
+const emitOrderUpdate = (req, order) => {
+  try {
+    const io = req.app.get('io');
+    if (io) {
+      // Notify user
+      io.to(`user_${order.userId}`).emit('order_update', order);
+      // Notify operator
+      io.to(`operator_${order.operatorId}`).emit('order_update', order);
+    }
+  } catch (e) { /* silent */ }
+};
+
 // ── Helper ────────────────────────────────────────────────
 function generateOTP() {
   return String(Math.floor(1000 + Math.random() * 9000)); // 4-digit
@@ -148,6 +161,15 @@ router.post("/", authMiddleware, roleMiddleware("user"), async (req, res) => {
       discountAmount,
     });
 
+    // Emit real-time event
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`user_${order.userId}`).emit('order_created', order);
+        io.to(`operator_${order.operatorId}`).emit('new_order', order);
+      }
+    } catch (e) { /* silent */ }
+
     res.json({ success: true, data: order });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -182,6 +204,7 @@ router.put("/:id/pay", authMiddleware, roleMiddleware("user"), async (req, res) 
     order.paymentStatus = "paid";
     await order.save();
 
+    emitOrderUpdate(req, order);
     res.json({ success: true, message: "Payment confirmed!", data: order });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -246,6 +269,8 @@ router.put("/:id/status", authMiddleware, roleMiddleware("operator"), async (req
 
     await order.save();
 
+    emitOrderUpdate(req, order);
+
     // Return order but strip OTP from response (don't send OTP to operator via this route — they enter it from the user)
     const safeOrder = order.toObject();
     delete safeOrder.deliveryOTP;
@@ -292,6 +317,7 @@ router.post("/:id/verify-otp", authMiddleware, roleMiddleware("operator"), async
     order.deliveryOTP = null;
     await order.save();
 
+    emitOrderUpdate(req, order);
     res.json({ success: true, message: "✅ Delivery confirmed! Order marked as delivered.", data: order });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -318,6 +344,7 @@ router.patch("/:id/cancel", authMiddleware, roleMiddleware("user"), async (req, 
     order.cancellationReason = reason || "User requested cancellation";
     await order.save();
 
+    emitOrderUpdate(req, order);
     res.json({ success: true, data: order });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
